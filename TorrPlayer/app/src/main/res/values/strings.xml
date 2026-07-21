@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TorrPlayer</string>
+    <string name="settings">Настройки</string>
+    <string name="home_description">Плеер готов к работе. Он появится в списке плееров
+        внутри Lampa — выберите его там при просмотре. Здесь можно только
+        настроить перемотку, буфер и продолжение просмотра.</string>
+    <string name="error_generic">Ошибка воспроизведения. Проверьте, что TorrServer запущен.</string>
+    <string name="no_video_link">Не получена ссылка на видео. Открывать TorrPlayer напрямую не нужно —
+        выберите его как плеер внутри Lampa.</string>
+    <string name="server_host">Адрес TorrServer для проверки связи (например 192.168.1.10:8090).
+        Для самого воспроизведения указывать не обязательно — плеер сам берёт адрес
+        из ссылки, которую присылает Lampa.</string>
+    <string name="seek_step">Шаг перемотки (сек)</string>
+    <string name="show_buffer">Показывать индикатор буфера</string>
+    <string name="resume_playback">Продолжать с места остановки</string>
+    <string name="test_connection">Проверить соединение</string>
+    <string name="connection_ok">Соединение успешно</string>
+    <string name="connection_fail">Не удалось подключиться</string>
+</resources>
