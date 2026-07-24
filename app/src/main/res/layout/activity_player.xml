@@ -11,7 +11,7 @@
         android:layout_height="match_parent"
         app:show_buffering="when_playing"
         app:use_controller="true"
-        app:controller_show_timeout_ms="4000" />
+        app:show_timeout="4000" />
 
     <LinearLayout
         android:id="@+id/buffer_overlay"
