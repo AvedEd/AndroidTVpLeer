@@ -14,14 +14,15 @@
         app:show_timeout="4000" />
 
     <LinearLayout
-        android:id="@+id/buffer_overlay"
+        android:id="@+id/info_panel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|end"
         android:layout_margin="24dp"
-        android:background="#88000000"
+        android:background="#AA000000"
         android:orientation="vertical"
-        android:padding="10dp">
+        android:padding="14dp"
+        android:visibility="gone">
 
         <TextView
             android:id="@+id/text_buffer"
@@ -29,35 +30,33 @@
             android:layout_height="wrap_content"
             android:textColor="#FFFFFF"
             android:textSize="14sp" />
-    </LinearLayout>
 
-    <LinearLayout
-        android:id="@+id/extra_controls"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="top|start"
-        android:layout_margin="24dp"
-        android:orientation="horizontal">
-
-        <Button
-            android:id="@+id/btn_audio"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Аудио" />
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
 
-        <Button
-            android:id="@+id/btn_subs"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="Субтитры" />
+            <Button
+                android:id="@+id/btn_audio"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Аудио" />
 
-        <Button
-            android:id="@+id/btn_speed"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="1.0x" />
+            <Button
+                android:id="@+id/btn_subs"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="Субтитры" />
+
+            <Button
+                android:id="@+id/btn_speed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="1.0x" />
+        </LinearLayout>
     </LinearLayout>
 
 </FrameLayout>
