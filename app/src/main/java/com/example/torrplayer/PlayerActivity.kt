@@ -5,6 +5,8 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.KeyEvent
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.C
@@ -39,6 +41,7 @@ class PlayerActivity : AppCompatActivity() {
         const val EXTRA_HASH = "extra_hash"
 
         private val SPEEDS = floatArrayOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
+        private const val PANEL_AUTO_HIDE_MS = 6000L
     }
 
     private lateinit var binding: ActivityPlayerBinding
@@ -49,11 +52,16 @@ class PlayerActivity : AppCompatActivity() {
     private var streamUrl: String = ""
     private var hash: String? = null
     private var speedIndex = 2 // 1.0x
+    private var panelVisible = false
 
     private val uiHandler = Handler(Looper.getMainLooper())
 
+    private val hidePanelRunnable = Runnable { hidePanel() }
+
     // Обновляет индикатор буфера раз в секунду данными самого плеера
     // (это всегда работает, независимо от точной схемы JSON-ответа TorrServer).
+    // Считает всегда, вне зависимости от того, видна ли панель — дёшево, а
+    // при открытии панели данные уже готовы и не нужно ждать первого тика.
     private val bufferUpdater = object : Runnable {
         override fun run() {
             player?.let {
@@ -108,14 +116,45 @@ class PlayerActivity : AppCompatActivity() {
             statsClient = TorrServerClient(host, TorrServerUrlUtils.schemeOf(streamUrl))
         }
 
-        binding.bufferOverlay.visibility =
-            if (prefs.showBufferOverlay) android.view.View.VISIBLE else android.view.View.GONE
+        // Панель (буфер + аудио/субтитры/скорость) по умолчанию скрыта — ничего не
+        // загромождает экран. Открывается кнопкой "вниз" на пульте (см. dispatchKeyEvent).
+        binding.infoPanel.visibility = View.GONE
+        binding.textBuffer.visibility = if (prefs.showBufferOverlay) View.VISIBLE else View.GONE
 
         binding.btnAudio.setOnClickListener { showTrackPicker(C.TRACK_TYPE_AUDIO, "Аудио дорожка") }
         binding.btnSubs.setOnClickListener { showTrackPicker(C.TRACK_TYPE_TEXT, "Субтитры") }
         binding.btnSpeed.setOnClickListener { cycleSpeed() }
 
         initPlayer()
+    }
+
+    /**
+     * Кнопка "вниз" на пульте открывает/закрывает информационную панель
+     * (вместо того, чтобы она постоянно висела на экране поверх видео).
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+            if (event.action == KeyEvent.ACTION_DOWN) togglePanel()
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    private fun togglePanel() {
+        if (panelVisible) hidePanel() else showPanel()
+    }
+
+    private fun showPanel() {
+        binding.infoPanel.visibility = View.VISIBLE
+        panelVisible = true
+        uiHandler.removeCallbacks(hidePanelRunnable)
+        uiHandler.postDelayed(hidePanelRunnable, PANEL_AUTO_HIDE_MS)
+    }
+
+    private fun hidePanel() {
+        binding.infoPanel.visibility = View.GONE
+        panelVisible = false
+        uiHandler.removeCallbacks(hidePanelRunnable)
     }
 
     /**
@@ -162,8 +201,11 @@ class PlayerActivity : AppCompatActivity() {
 
         exoPlayer.addListener(object : Player.Listener {
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                // Показать ошибку прямо на буфер-оверлее — без сети/декодера проигрывание невозможно.
+                // Показать ошибку прямо на панели и открыть её — без сети/декодера
+                // проигрывание невозможно, человек должен это увидеть сразу.
                 binding.textBuffer.text = "Ошибка воспроизведения:\n${error.errorCodeName}"
+                binding.textBuffer.visibility = View.VISIBLE
+                showPanel()
             }
         })
 
