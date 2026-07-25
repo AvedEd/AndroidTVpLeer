@@ -13,7 +13,7 @@ class AppPrefs(context: Context) {
 
     /** Шаг перемотки в секундах, доступный из настроек. */
     var seekStepSeconds: Int
-        get() = sp.getInt(KEY_SEEK_STEP, 10)
+        get() = sp.getInt(KEY_SEEK_STEP, 1)
         set(value) = sp.edit().putInt(KEY_SEEK_STEP, value).apply()
 
     var showBufferOverlay: Boolean
