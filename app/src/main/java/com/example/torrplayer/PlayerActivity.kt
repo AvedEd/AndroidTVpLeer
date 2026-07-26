@@ -15,8 +15,12 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.example.torrplayer.databinding.ActivityPlayerBinding
 import com.example.torrplayer.prefs.AppPrefs
 import com.example.torrplayer.torrserver.TorrServerClient
@@ -24,16 +28,6 @@ import com.example.torrplayer.util.Formatting
 import com.example.torrplayer.util.TorrServerUrlUtils
 import kotlinx.coroutines.launch
 
-/**
- * Экран воспроизведения.
- *
- * Запускается двумя способами:
- *  1) Извне, из Lampa (или любого другого приложения), стандартным
- *     Intent.ACTION_VIEW со ссылкой на поток TorrServer — именно за счёт
- *     intent-filter в манифесте это приложение появляется в списке плееров.
- *  2) Изнутри самого TorrPlayer с явными extra (EXTRA_STREAM_URL и т.д.),
- *     если он когда-нибудь понадобится как отдельное приложение.
- */
 class PlayerActivity : AppCompatActivity() {
 
     companion object {
@@ -44,10 +38,17 @@ class PlayerActivity : AppCompatActivity() {
         private val SPEEDS = floatArrayOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
         private const val PANEL_AUTO_HIDE_MS = 6000L
 
-        // Ускоренная перемотка при удержании влево/вправо.
-        private const val SEEK_TICK_MS = 300L          // как часто "подкручиваем" во время удержания
-        private const val SEEK_ACCEL_STAGE1_MS = 1500L // после этого — средняя скорость
-        private const val SEEK_ACCEL_STAGE2_MS = 4000L // после этого — быстрая скорость
+        private const val SEEK_TICK_MS = 300L
+        private const val SEEK_ACCEL_STAGE1_MS = 1500L
+        private const val SEEK_ACCEL_STAGE2_MS = 4000L
+
+        private const val MIN_BUFFER_MS = 30_000
+        private const val MAX_BUFFER_MS = 90_000
+        private const val BUFFER_FOR_PLAYBACK_MS = 5_000
+        private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 10_000
+
+        private const val HTTP_CONNECT_TIMEOUT_MS = 15_000
+        private const val HTTP_READ_TIMEOUT_MS = 20_000
     }
 
     private lateinit var binding: ActivityPlayerBinding
@@ -57,14 +58,13 @@ class PlayerActivity : AppCompatActivity() {
 
     private var streamUrl: String = ""
     private var hash: String? = null
-    private var speedIndex = 2 // 1.0x
+    private var speedIndex = 2
     private var panelVisible = false
 
     private val uiHandler = Handler(Looper.getMainLooper())
 
     private val hidePanelRunnable = Runnable { hidePanel() }
 
-    // Направление удерживаемой перемотки: -1 назад, +1 вперёд, 0 — не удерживается.
     private var seekHoldDirection = 0
     private var seekHoldStartedAt = 0L
 
@@ -78,10 +78,6 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    // Обновляет индикатор буфера раз в секунду данными самого плеера
-    // (это всегда работает, независимо от точной схемы JSON-ответа TorrServer).
-    // Считает всегда, вне зависимости от того, видна ли панель — дёшево, а
-    // при открытии панели данные уже готовы и не нужно ждать первого тика.
     private val bufferUpdater = object : Runnable {
         override fun run() {
             player?.let {
@@ -95,7 +91,6 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    // Дополнительно — раз в 4 секунды опрашивает TorrServer о скорости закачки/пирах, если хеш известен.
     private val serverStatsUpdater = object : Runnable {
         override fun run() {
             val h = hash
@@ -130,14 +125,10 @@ class PlayerActivity : AppCompatActivity() {
         streamUrl = resolved.first
         hash = resolved.second
 
-        // Хост для статистики берём прямо из полученной ссылки — так плеер работает
-        // "из коробки" с любым TorrServer, без ручной настройки адреса.
         TorrServerUrlUtils.hostOf(streamUrl)?.let { host ->
             statsClient = TorrServerClient(host, TorrServerUrlUtils.schemeOf(streamUrl))
         }
 
-        // Панель (буфер + аудио/субтитры/скорость) по умолчанию скрыта — ничего не
-        // загромождает экран. Открывается кнопкой "вниз" на пульте (см. dispatchKeyEvent).
         binding.infoPanel.visibility = View.GONE
         binding.textBuffer.visibility = if (prefs.showBufferOverlay) View.VISIBLE else View.GONE
 
@@ -148,13 +139,6 @@ class PlayerActivity : AppCompatActivity() {
         initPlayer()
     }
 
-    /**
-     * Кнопка "вниз" на пульте открывает/закрывает информационную панель.
-     * Кнопки "влево"/"вправо" — перемотка: короткое нажатие — обычный шаг из
-     * настроек, удержание — перемотка ускоряется. Пока панель открыта, эти
-     * же кнопки вместо перемотки двигают фокус между её кнопками — поэтому
-     * свою обработку включаем только когда панель скрыта.
-     */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
             if (event.action == KeyEvent.ACTION_DOWN) togglePanel()
@@ -236,7 +220,26 @@ class PlayerActivity : AppCompatActivity() {
         val renderersFactory = DefaultRenderersFactory(this)
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
 
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                MIN_BUFFER_MS,
+                MAX_BUFFER_MS,
+                BUFFER_FOR_PLAYBACK_MS,
+                BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS
+            )
+            .build()
+
+        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setConnectTimeoutMs(HTTP_CONNECT_TIMEOUT_MS)
+            .setReadTimeoutMs(HTTP_READ_TIMEOUT_MS)
+            .setAllowCrossProtocolRedirects(true)
+        val mediaSourceFactory = DefaultMediaSourceFactory(
+            DefaultDataSource.Factory(this, httpDataSourceFactory)
+        )
+
         val exoPlayer = ExoPlayer.Builder(this, renderersFactory)
+            .setLoadControl(loadControl)
+            .setMediaSourceFactory(mediaSourceFactory)
             .setSeekForwardIncrementMs(seekMs)
             .setSeekBackIncrementMs(seekMs)
             .build()
@@ -244,10 +247,6 @@ class PlayerActivity : AppCompatActivity() {
         player = exoPlayer
         binding.playerView.player = exoPlayer
 
-        // Подставляем запомненные с прошлого раза озвучку/субтитры — работает
-        // "по языку" дорожки, поэтому сработает только если релиз его указывает
-        // (для большинства mkv-раздач это так). Если языка нет — ExoPlayer просто
-        // выберет дорожку по умолчанию, ничего не сломается.
         val trackParams = exoPlayer.trackSelectionParameters.buildUpon()
         prefs.preferredAudioLanguage?.let { trackParams.setPreferredAudioLanguage(it) }
         if (prefs.subtitlesEnabled) {
@@ -258,7 +257,6 @@ class PlayerActivity : AppCompatActivity() {
         }
         exoPlayer.trackSelectionParameters = trackParams.build()
 
-        // Запомненная скорость воспроизведения.
         speedIndex = closestSpeedIndex(prefs.playbackSpeed)
         val startSpeed = SPEEDS[speedIndex]
         exoPlayer.playbackParameters = PlaybackParameters(startSpeed)
