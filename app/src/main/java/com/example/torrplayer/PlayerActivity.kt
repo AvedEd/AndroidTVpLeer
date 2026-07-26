@@ -168,16 +168,12 @@ class PlayerActivity : AppCompatActivity() {
             when (event.action) {
                 KeyEvent.ACTION_DOWN -> {
                     if (event.repeatCount == 0) {
-                        // Первое нажатие — сразу один обычный шаг, дальше ждём,
-                        // не отпустили ли кнопку быстро, или начинаем ускорение.
                         seekHoldDirection = direction
                         seekHoldStartedAt = SystemClock.elapsedRealtime()
                         performSeek(prefs.seekStepSeconds * direction)
                         uiHandler.removeCallbacks(seekHoldRunnable)
                         uiHandler.postDelayed(seekHoldRunnable, 400)
                     }
-                    // Повторные системные ACTION_DOWN (repeatCount > 0) игнорируем —
-                    // ускорением занимается свой собственный seekHoldRunnable.
                 }
                 KeyEvent.ACTION_UP -> {
                     seekHoldDirection = 0
@@ -190,7 +186,6 @@ class PlayerActivity : AppCompatActivity() {
         return super.dispatchKeyEvent(event)
     }
 
-    /** Шаг перемотки (в секундах) в зависимости от того, сколько уже удерживается кнопка. */
     private fun seekStepForHold(heldMs: Long): Int {
         val base = prefs.seekStepSeconds.coerceAtLeast(1)
         return when {
@@ -224,15 +219,9 @@ class PlayerActivity : AppCompatActivity() {
         uiHandler.removeCallbacks(hidePanelRunnable)
     }
 
-    /**
-     * Достаёт URL видео и (если получится) хеш торрента либо из внешнего
-     * Intent.ACTION_VIEW (Lampa и подобные), либо из собственных extra.
-     * Возвращает null, если плеер запущен без данных о видео.
-     */
     private fun resolveIncomingVideo(): Pair<String, String?>? {
         if (intent?.action == Intent.ACTION_VIEW && intent.data != null) {
             val url = intent.data.toString()
-            // "link" в query-строке TorrServer — это и есть хеш торрента.
             val hashFromUrl = TorrServerUrlUtils.hashOf(url)
             return url to hashFromUrl
         }
@@ -245,10 +234,6 @@ class PlayerActivity : AppCompatActivity() {
         val seekMs = prefs.seekStepSeconds * 1000L
 
         val renderersFactory = DefaultRenderersFactory(this)
-            // PREFER означает: если в проект добавлено расширение с программными декодерами
-            // (например, media3 FFmpeg extension для DTS/TrueHD), оно будет использовано
-            // в приоритете перед стандартными — без этого расширения приложение всё равно
-            // воспроизводит все контейнеры/кодеки, поддерживаемые железом приставки.
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
 
         val exoPlayer = ExoPlayer.Builder(this, renderersFactory)
@@ -259,6 +244,26 @@ class PlayerActivity : AppCompatActivity() {
         player = exoPlayer
         binding.playerView.player = exoPlayer
 
+        // Подставляем запомненные с прошлого раза озвучку/субтитры — работает
+        // "по языку" дорожки, поэтому сработает только если релиз его указывает
+        // (для большинства mkv-раздач это так). Если языка нет — ExoPlayer просто
+        // выберет дорожку по умолчанию, ничего не сломается.
+        val trackParams = exoPlayer.trackSelectionParameters.buildUpon()
+        prefs.preferredAudioLanguage?.let { trackParams.setPreferredAudioLanguage(it) }
+        if (prefs.subtitlesEnabled) {
+            prefs.preferredSubtitleLanguage?.let { trackParams.setPreferredTextLanguage(it) }
+            trackParams.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+        } else {
+            trackParams.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+        }
+        exoPlayer.trackSelectionParameters = trackParams.build()
+
+        // Запомненная скорость воспроизведения.
+        speedIndex = closestSpeedIndex(prefs.playbackSpeed)
+        val startSpeed = SPEEDS[speedIndex]
+        exoPlayer.playbackParameters = PlaybackParameters(startSpeed)
+        binding.btnSpeed.text = "${startSpeed}x"
+
         val mediaItem = MediaItem.fromUri(streamUrl)
         val startPos = if (prefs.resumePlayback) prefs.loadPosition(streamUrl) else 0L
 
@@ -268,8 +273,6 @@ class PlayerActivity : AppCompatActivity() {
 
         exoPlayer.addListener(object : Player.Listener {
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                // Показать ошибку прямо на панели и открыть её — без сети/декодера
-                // проигрывание невозможно, человек должен это увидеть сразу.
                 binding.textBuffer.text = "Ошибка воспроизведения:\n${error.errorCodeName}"
                 binding.textBuffer.visibility = View.VISIBLE
                 showPanel()
@@ -280,11 +283,25 @@ class PlayerActivity : AppCompatActivity() {
         uiHandler.post(serverStatsUpdater)
     }
 
+    private fun closestSpeedIndex(target: Float): Int {
+        var bestIndex = 2
+        var bestDiff = Float.MAX_VALUE
+        SPEEDS.forEachIndexed { index, speed ->
+            val diff = kotlin.math.abs(speed - target)
+            if (diff < bestDiff) {
+                bestDiff = diff
+                bestIndex = index
+            }
+        }
+        return bestIndex
+    }
+
     private fun cycleSpeed() {
         speedIndex = (speedIndex + 1) % SPEEDS.size
         val speed = SPEEDS[speedIndex]
         player?.playbackParameters = PlaybackParameters(speed)
         binding.btnSpeed.text = "${speed}x"
+        prefs.playbackSpeed = speed
     }
 
     private fun showTrackPicker(trackType: Int, dialogTitle: String) {
@@ -295,7 +312,7 @@ class PlayerActivity : AppCompatActivity() {
             return
         }
         val labels = mutableListOf("Выключить")
-        val entries = mutableListOf<Pair<Int, Int>?>(null) // (groupIndex, trackIndex)
+        val entries = mutableListOf<Pair<Int, Int>?>(null)
 
         groups.forEachIndexed { groupIndex, group ->
             for (trackIndex in 0 until group.length) {
@@ -311,11 +328,23 @@ class PlayerActivity : AppCompatActivity() {
                 val builder = p.trackSelectionParameters.buildUpon()
                 if (which == 0) {
                     builder.setTrackTypeDisabled(trackType, true)
+                    if (trackType == C.TRACK_TYPE_TEXT) {
+                        prefs.subtitlesEnabled = false
+                        prefs.preferredSubtitleLanguage = null
+                    }
                 } else {
                     val (groupIndex, trackIndex) = entries[which]!!
                     val group = groups[groupIndex]
+                    val language = group.getTrackFormat(trackIndex).language
                     builder.setTrackTypeDisabled(trackType, false)
                     builder.addOverride(TrackSelectionOverride(group.mediaTrackGroup, trackIndex))
+
+                    if (trackType == C.TRACK_TYPE_AUDIO) {
+                        prefs.preferredAudioLanguage = language
+                    } else if (trackType == C.TRACK_TYPE_TEXT) {
+                        prefs.subtitlesEnabled = true
+                        prefs.preferredSubtitleLanguage = language
+                    }
                 }
                 p.trackSelectionParameters = builder.build()
             }
@@ -324,7 +353,6 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
-        // Запоминаем позицию, чтобы при повторном открытии этого же файла продолжить с места остановки.
         player?.let { prefs.savePosition(streamUrl, it.currentPosition) }
     }
 
