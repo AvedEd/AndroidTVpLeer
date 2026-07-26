@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
@@ -42,6 +43,11 @@ class PlayerActivity : AppCompatActivity() {
 
         private val SPEEDS = floatArrayOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
         private const val PANEL_AUTO_HIDE_MS = 6000L
+
+        // Ускоренная перемотка при удержании влево/вправо.
+        private const val SEEK_TICK_MS = 300L          // как часто "подкручиваем" во время удержания
+        private const val SEEK_ACCEL_STAGE1_MS = 1500L // после этого — средняя скорость
+        private const val SEEK_ACCEL_STAGE2_MS = 4000L // после этого — быстрая скорость
     }
 
     private lateinit var binding: ActivityPlayerBinding
@@ -57,6 +63,20 @@ class PlayerActivity : AppCompatActivity() {
     private val uiHandler = Handler(Looper.getMainLooper())
 
     private val hidePanelRunnable = Runnable { hidePanel() }
+
+    // Направление удерживаемой перемотки: -1 назад, +1 вперёд, 0 — не удерживается.
+    private var seekHoldDirection = 0
+    private var seekHoldStartedAt = 0L
+
+    private val seekHoldRunnable = object : Runnable {
+        override fun run() {
+            if (seekHoldDirection == 0) return
+            val heldMs = SystemClock.elapsedRealtime() - seekHoldStartedAt
+            val stepSeconds = seekStepForHold(heldMs)
+            performSeek(stepSeconds * seekHoldDirection)
+            uiHandler.postDelayed(this, SEEK_TICK_MS)
+        }
+    }
 
     // Обновляет индикатор буфера раз в секунду данными самого плеера
     // (это всегда работает, независимо от точной схемы JSON-ответа TorrServer).
@@ -129,15 +149,62 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     /**
-     * Кнопка "вниз" на пульте открывает/закрывает информационную панель
-     * (вместо того, чтобы она постоянно висела на экране поверх видео).
+     * Кнопка "вниз" на пульте открывает/закрывает информационную панель.
+     * Кнопки "влево"/"вправо" — перемотка: короткое нажатие — обычный шаг из
+     * настроек, удержание — перемотка ускоряется. Пока панель открыта, эти
+     * же кнопки вместо перемотки двигают фокус между её кнопками — поэтому
+     * свою обработку включаем только когда панель скрыта.
      */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
             if (event.action == KeyEvent.ACTION_DOWN) togglePanel()
             return true
         }
+
+        if (!panelVisible &&
+            (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT || event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT)
+        ) {
+            val direction = if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) 1 else -1
+            when (event.action) {
+                KeyEvent.ACTION_DOWN -> {
+                    if (event.repeatCount == 0) {
+                        // Первое нажатие — сразу один обычный шаг, дальше ждём,
+                        // не отпустили ли кнопку быстро, или начинаем ускорение.
+                        seekHoldDirection = direction
+                        seekHoldStartedAt = SystemClock.elapsedRealtime()
+                        performSeek(prefs.seekStepSeconds * direction)
+                        uiHandler.removeCallbacks(seekHoldRunnable)
+                        uiHandler.postDelayed(seekHoldRunnable, 400)
+                    }
+                    // Повторные системные ACTION_DOWN (repeatCount > 0) игнорируем —
+                    // ускорением занимается свой собственный seekHoldRunnable.
+                }
+                KeyEvent.ACTION_UP -> {
+                    seekHoldDirection = 0
+                    uiHandler.removeCallbacks(seekHoldRunnable)
+                }
+            }
+            return true
+        }
+
         return super.dispatchKeyEvent(event)
+    }
+
+    /** Шаг перемотки (в секундах) в зависимости от того, сколько уже удерживается кнопка. */
+    private fun seekStepForHold(heldMs: Long): Int {
+        val base = prefs.seekStepSeconds.coerceAtLeast(1)
+        return when {
+            heldMs < SEEK_ACCEL_STAGE1_MS -> base * 3
+            heldMs < SEEK_ACCEL_STAGE2_MS -> base * 10
+            else -> base * 25
+        }
+    }
+
+    private fun performSeek(deltaSeconds: Int) {
+        val p = player ?: return
+        val durationMs = if (p.duration > 0) p.duration else Long.MAX_VALUE
+        val target = (p.currentPosition + deltaSeconds * 1000L).coerceIn(0, durationMs)
+        p.seekTo(target)
     }
 
     private fun togglePanel() {
