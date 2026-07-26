@@ -24,6 +24,26 @@ class AppPrefs(context: Context) {
         get() = sp.getBoolean(KEY_RESUME, true)
         set(value) = sp.edit().putBoolean(KEY_RESUME, value).apply()
 
+    /** Код языка последней выбранной аудиодорожки (например "rus"), либо null — нет предпочтения. */
+    var preferredAudioLanguage: String?
+        get() = sp.getString(KEY_AUDIO_LANG, null)
+        set(value) = sp.edit().putString(KEY_AUDIO_LANG, value).apply()
+
+    /** Код языка последних выбранных субтитров, либо null — нет предпочтения. */
+    var preferredSubtitleLanguage: String?
+        get() = sp.getString(KEY_SUB_LANG, null)
+        set(value) = sp.edit().putString(KEY_SUB_LANG, value).apply()
+
+    /** Были ли субтитры последний раз включены (по умолчанию — выключены). */
+    var subtitlesEnabled: Boolean
+        get() = sp.getBoolean(KEY_SUB_ENABLED, false)
+        set(value) = sp.edit().putBoolean(KEY_SUB_ENABLED, value).apply()
+
+    /** Последняя выбранная скорость воспроизведения. */
+    var playbackSpeed: Float
+        get() = sp.getFloat(KEY_SPEED, 1.0f)
+        set(value) = sp.edit().putFloat(KEY_SPEED, value).apply()
+
     /** Позиция воспроизведения для конкретного файла (ключ — url потока). */
     fun savePosition(streamUrl: String, positionMs: Long) {
         sp.edit().putLong(posKey(streamUrl), positionMs).apply()
@@ -39,5 +59,9 @@ class AppPrefs(context: Context) {
         private const val KEY_SEEK_STEP = "seek_step"
         private const val KEY_SHOW_BUFFER = "show_buffer"
         private const val KEY_RESUME = "resume_playback"
+        private const val KEY_AUDIO_LANG = "preferred_audio_lang"
+        private const val KEY_SUB_LANG = "preferred_sub_lang"
+        private const val KEY_SUB_ENABLED = "subtitles_enabled"
+        private const val KEY_SPEED = "playback_speed"
     }
 }
