@@ -86,6 +86,20 @@ class PlayerActivity : AppCompatActivity() {
                 val durMs = if (it.duration > 0) it.duration else 0
                 binding.textBuffer.text = "Буфер: $bufferedPct%\n" +
                     "${Formatting.time(posMs)} / ${Formatting.time(durMs)}"
+
+                val vf = it.videoFormat
+                val af = it.audioFormat
+                val videoLine = vf?.let { f ->
+                    val res = if (f.width > 0 && f.height > 0) "${f.width}x${f.height} " else ""
+                    val br = Formatting.bitrate(f.bitrate)
+                    "Видео: $res${Formatting.videoCodecName(f.sampleMimeType)}" +
+                        if (br.isNotEmpty()) " • $br" else ""
+                } ?: "Видео: —"
+                val audioLine = af?.let { f ->
+                    val ch = if (f.channelCount > 0) " ${f.channelCount}ch" else ""
+                    "Аудио: ${Formatting.audioCodecName(f.sampleMimeType)}$ch"
+                } ?: "Аудио: —"
+                binding.textVideoInfo.text = "$videoLine\n$audioLine"
             }
             uiHandler.postDelayed(this, 1000)
         }
@@ -131,10 +145,12 @@ class PlayerActivity : AppCompatActivity() {
 
         binding.infoPanel.visibility = View.GONE
         binding.textBuffer.visibility = if (prefs.showBufferOverlay) View.VISIBLE else View.GONE
+        binding.textVideoInfo.visibility = if (prefs.showBufferOverlay) View.VISIBLE else View.GONE
 
         binding.btnAudio.setOnClickListener { showTrackPicker(C.TRACK_TYPE_AUDIO, "Аудио дорожка") }
         binding.btnSubs.setOnClickListener { showTrackPicker(C.TRACK_TYPE_TEXT, "Субтитры") }
         binding.btnSpeed.setOnClickListener { cycleSpeed() }
+        binding.btnRetry.setOnClickListener { retryPlayback() }
 
         initPlayer()
     }
@@ -271,8 +287,10 @@ class PlayerActivity : AppCompatActivity() {
 
         exoPlayer.addListener(object : Player.Listener {
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                binding.textBuffer.text = "Ошибка воспроизведения:\n${error.errorCodeName}"
+                binding.textBuffer.text = "Не удалось воспроизвести (обрыв связи с TorrServer?)\n" +
+                    "Код ошибки: ${error.errorCodeName}"
                 binding.textBuffer.visibility = View.VISIBLE
+                binding.btnRetry.visibility = View.VISIBLE
                 showPanel()
             }
         })
@@ -292,6 +310,15 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
         return bestIndex
+    }
+
+    private fun retryPlayback() {
+        binding.btnRetry.visibility = View.GONE
+        binding.textBuffer.text = "Повторное подключение…"
+        player?.let {
+            it.prepare()
+            it.playWhenReady = true
+        }
     }
 
     private fun cycleSpeed() {
