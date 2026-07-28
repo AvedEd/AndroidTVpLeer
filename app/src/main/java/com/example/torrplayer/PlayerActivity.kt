@@ -21,6 +21,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.ui.AspectRatioFrameLayout
 import com.example.torrplayer.databinding.ActivityPlayerBinding
 import com.example.torrplayer.prefs.AppPrefs
 import com.example.torrplayer.torrserver.TorrServerClient
@@ -37,6 +38,13 @@ class PlayerActivity : AppCompatActivity() {
 
         private val SPEEDS = floatArrayOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
         private const val PANEL_AUTO_HIDE_MS = 6000L
+
+        private val RESIZE_MODES = intArrayOf(
+            AspectRatioFrameLayout.RESIZE_MODE_FIT,
+            AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
+            AspectRatioFrameLayout.RESIZE_MODE_FILL
+        )
+        private val RESIZE_LABELS = arrayOf("По размеру", "Обрезать", "Растянуть")
 
         private const val SEEK_TICK_MS = 300L
         private const val SEEK_ACCEL_STAGE1_MS = 1500L
@@ -59,6 +67,7 @@ class PlayerActivity : AppCompatActivity() {
     private var streamUrl: String = ""
     private var hash: String? = null
     private var speedIndex = 2
+    private var aspectIndex = 0
     private var panelVisible = false
 
     private val uiHandler = Handler(Looper.getMainLooper())
@@ -151,6 +160,11 @@ class PlayerActivity : AppCompatActivity() {
         binding.btnSubs.setOnClickListener { showTrackPicker(C.TRACK_TYPE_TEXT, "Субтитры") }
         binding.btnSpeed.setOnClickListener { cycleSpeed() }
         binding.btnRetry.setOnClickListener { retryPlayback() }
+        binding.btnAspect.setOnClickListener { cycleAspect() }
+
+        aspectIndex = RESIZE_MODES.indexOf(prefs.resizeMode).coerceAtLeast(0)
+        binding.playerView.resizeMode = RESIZE_MODES[aspectIndex]
+        binding.btnAspect.text = RESIZE_LABELS[aspectIndex]
 
         initPlayer()
     }
@@ -319,6 +333,13 @@ class PlayerActivity : AppCompatActivity() {
             it.prepare()
             it.playWhenReady = true
         }
+    }
+
+    private fun cycleAspect() {
+        aspectIndex = (aspectIndex + 1) % RESIZE_MODES.size
+        binding.playerView.resizeMode = RESIZE_MODES[aspectIndex]
+        binding.btnAspect.text = RESIZE_LABELS[aspectIndex]
+        prefs.resizeMode = RESIZE_MODES[aspectIndex]
     }
 
     private fun cycleSpeed() {
