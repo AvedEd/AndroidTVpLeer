@@ -44,6 +44,11 @@ class AppPrefs(context: Context) {
         get() = sp.getFloat(KEY_SPEED, 1.0f)
         set(value) = sp.edit().putFloat(KEY_SPEED, value).apply()
 
+    /** Режим масштабирования картинки (значение AspectRatioFrameLayout.RESIZE_MODE_*). */
+    var resizeMode: Int
+        get() = sp.getInt(KEY_RESIZE_MODE, 0) // 0 = RESIZE_MODE_FIT
+        set(value) = sp.edit().putInt(KEY_RESIZE_MODE, value).apply()
+
     /** Позиция воспроизведения для конкретного файла (ключ — url потока). */
     fun savePosition(streamUrl: String, positionMs: Long) {
         sp.edit().putLong(posKey(streamUrl), positionMs).apply()
@@ -63,5 +68,6 @@ class AppPrefs(context: Context) {
         private const val KEY_SUB_LANG = "preferred_sub_lang"
         private const val KEY_SUB_ENABLED = "subtitles_enabled"
         private const val KEY_SPEED = "playback_speed"
+        private const val KEY_RESIZE_MODE = "resize_mode"
     }
 }
