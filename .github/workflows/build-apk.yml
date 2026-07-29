@@ -27,7 +27,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build debug APK
-        run: gradle assembleDebug --stacktrace
+        run: gradle assembleDebug -PversionCode=${{ github.run_number }} --stacktrace
 
       - name: Upload build artifact (backup download route)
         uses: actions/upload-artifact@v4
