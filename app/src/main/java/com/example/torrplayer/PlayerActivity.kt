@@ -69,6 +69,7 @@ class PlayerActivity : AppCompatActivity() {
     private var speedIndex = 2
     private var aspectIndex = 0
     private var panelVisible = false
+    private var lastAppliedFrameRate = 0f
 
     private val uiHandler = Handler(Looper.getMainLooper())
 
@@ -109,6 +110,8 @@ class PlayerActivity : AppCompatActivity() {
                     "Аудио: ${Formatting.audioCodecName(f.sampleMimeType)}$ch"
                 } ?: "Аудио: —"
                 binding.textVideoInfo.text = "$videoLine\n$audioLine"
+
+                vf?.frameRate?.takeIf { fr -> fr > 0f }?.let { adjustDisplayRefreshRate(it) }
             }
             uiHandler.postDelayed(this, 1000)
         }
@@ -332,6 +335,35 @@ class PlayerActivity : AppCompatActivity() {
         player?.let {
             it.prepare()
             it.playWhenReady = true
+        }
+    }
+
+    private fun adjustDisplayRefreshRate(contentFrameRate: Float) {
+        if (contentFrameRate == lastAppliedFrameRate) return
+        lastAppliedFrameRate = contentFrameRate
+
+        val display = window?.decorView?.display ?: return
+        val currentMode = display.mode
+        var bestMode = currentMode
+        var bestDiff = Float.MAX_VALUE
+
+        for (mode in display.supportedModes) {
+            if (mode.physicalWidth != currentMode.physicalWidth ||
+                mode.physicalHeight != currentMode.physicalHeight
+            ) continue
+
+            val multiple = Math.round(mode.refreshRate / contentFrameRate).coerceAtLeast(1)
+            val diff = kotlin.math.abs(mode.refreshRate - contentFrameRate * multiple)
+            if (diff < bestDiff) {
+                bestDiff = diff
+                bestMode = mode
+            }
+        }
+
+        if (bestDiff < 0.3f && bestMode.modeId != currentMode.modeId) {
+            val attrs = window.attributes
+            attrs.preferredDisplayModeId = bestMode.modeId
+            window.attributes = attrs
         }
     }
 
