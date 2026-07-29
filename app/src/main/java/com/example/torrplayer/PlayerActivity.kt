@@ -2,13 +2,18 @@ package com.example.torrplayer
 
 import android.app.AlertDialog
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.provider.Settings
 import android.view.KeyEvent
 import android.view.View
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -27,7 +32,11 @@ import com.example.torrplayer.prefs.AppPrefs
 import com.example.torrplayer.torrserver.TorrServerClient
 import com.example.torrplayer.util.Formatting
 import com.example.torrplayer.util.TorrServerUrlUtils
+import com.example.torrplayer.util.UpdateChecker
+import com.example.torrplayer.util.UpdateInfo
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class PlayerActivity : AppCompatActivity() {
 
@@ -70,6 +79,7 @@ class PlayerActivity : AppCompatActivity() {
     private var aspectIndex = 0
     private var panelVisible = false
     private var lastAppliedFrameRate = 0f
+    private var pendingUpdate: UpdateInfo? = null
 
     private val uiHandler = Handler(Looper.getMainLooper())
 
@@ -164,10 +174,13 @@ class PlayerActivity : AppCompatActivity() {
         binding.btnSpeed.setOnClickListener { cycleSpeed() }
         binding.btnRetry.setOnClickListener { retryPlayback() }
         binding.btnAspect.setOnClickListener { cycleAspect() }
+        binding.btnUpdate.setOnClickListener { pendingUpdate?.let { u -> installUpdate(u) } }
 
         aspectIndex = RESIZE_MODES.indexOf(prefs.resizeMode).coerceAtLeast(0)
         binding.playerView.resizeMode = RESIZE_MODES[aspectIndex]
         binding.btnAspect.text = RESIZE_LABELS[aspectIndex]
+
+        checkForUpdateInBackground()
 
         initPlayer()
     }
@@ -364,6 +377,58 @@ class PlayerActivity : AppCompatActivity() {
             val attrs = window.attributes
             attrs.preferredDisplayModeId = bestMode.modeId
             window.attributes = attrs
+        }
+    }
+
+    private fun checkForUpdateInBackground() {
+        val currentCode = try {
+            val info = packageManager.getPackageInfo(packageName, 0)
+            if (Build.VERSION.SDK_INT >= 28) info.longVersionCode.toInt()
+            else @Suppress("DEPRECATION") info.versionCode
+        } catch (e: Exception) {
+            0
+        }
+
+        lifecycleScope.launch {
+            val update = withContext(Dispatchers.IO) { UpdateChecker.checkForUpdate(currentCode) }
+            if (update != null) {
+                pendingUpdate = update
+                binding.btnUpdate.text = "Обновление ${update.tagName}"
+                binding.btnUpdate.visibility = View.VISIBLE
+            }
+        }
+    }
+
+    private fun installUpdate(update: UpdateInfo) {
+        if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
+            Toast.makeText(
+                this,
+                "Разрешите установку из TorrPlayer в открывшихся настройках, затем нажмите «Обновление» ещё раз",
+                Toast.LENGTH_LONG
+            ).show()
+            startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+            return
+        }
+
+        binding.btnUpdate.isEnabled = false
+        binding.btnUpdate.text = "Скачивание…"
+
+        lifecycleScope.launch {
+            val file = withContext(Dispatchers.IO) { UpdateChecker.downloadApk(this@PlayerActivity, update.downloadUrl) }
+            binding.btnUpdate.isEnabled = true
+
+            if (file == null) {
+                Toast.makeText(this@PlayerActivity, "Не удалось скачать обновление", Toast.LENGTH_LONG).show()
+                binding.btnUpdate.text = "Обновление ${update.tagName}"
+                return@launch
+            }
+
+            val uri = FileProvider.getUriForFile(this@PlayerActivity, "$packageName.fileprovider", file)
+            val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(installIntent)
         }
     }
 
