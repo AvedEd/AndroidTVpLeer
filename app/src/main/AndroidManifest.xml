@@ -120,7 +120,10 @@
                 <data android:pathPattern=".*\\.m3u8" />
                 <data android:pathPattern=".*\\.M3U8" />
                 <data android:pathPattern=".*\\.mpd" />
-                <data android:pathPattern=".*\\.MPD" />
+                <data android:pathPattern=".*\\.<data android:pathPattern=".*\.dts" />
+                <data android:pathPattern=".*\.DTS" />
+                <data android:pathPattern=".*\.vob" />
+                <data android:pathPattern=".*\.VOB" />
             </intent-filter>
         </activity>
 
