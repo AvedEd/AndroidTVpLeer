@@ -290,8 +290,13 @@ class PlayerActivity : AppCompatActivity() {
     private fun initPlayer() {
         val seekMs = prefs.seekStepSeconds * 1000L
 
+        val rendererMode = if (prefs.audioForcePcm) {
+            DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+        } else {
+            DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+        }
         val renderersFactory = DefaultRenderersFactory(this)
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+            .setExtensionRendererMode(rendererMode)
 
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
