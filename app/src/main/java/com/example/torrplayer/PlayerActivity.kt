@@ -30,6 +30,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import com.example.torrplayer.databinding.ActivityPlayerBinding
 import com.example.torrplayer.prefs.AppPrefs
 import com.example.torrplayer.torrserver.TorrServerClient
+import com.example.torrplayer.torrserver.TorrentFileStat
 import com.example.torrplayer.util.Formatting
 import com.example.torrplayer.util.TorrServerUrlUtils
 import com.example.torrplayer.util.UpdateChecker
@@ -37,6 +38,7 @@ import com.example.torrplayer.util.UpdateInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.net.URLEncoder
 
 class PlayerActivity : AppCompatActivity() {
 
@@ -66,7 +68,14 @@ class PlayerActivity : AppCompatActivity() {
 
         private const val HTTP_CONNECT_TIMEOUT_MS = 15_000
         private const val HTTP_READ_TIMEOUT_MS = 20_000
+
+        private val VIDEO_EXTENSIONS = setOf(
+            "mp4", "m4v", "mkv", "webm", "avi", "mov", "ts", "m2ts", "mts",
+            "3gp", "3gpp", "flv", "wmv", "mpg", "mpeg", "ogv", "divx", "vob"
+        )
     }
+
+    private enum class Panel { NONE, CONTROLS, INFO }
 
     private lateinit var binding: ActivityPlayerBinding
     private lateinit var prefs: AppPrefs
@@ -77,13 +86,14 @@ class PlayerActivity : AppCompatActivity() {
     private var hash: String? = null
     private var speedIndex = 2
     private var aspectIndex = 0
-    private var panelVisible = false
+    private var currentPanel = Panel.NONE
     private var lastAppliedFrameRate = 0f
     private var pendingUpdate: UpdateInfo? = null
+    private var episodeFiles: List<TorrentFileStat> = emptyList()
 
     private val uiHandler = Handler(Looper.getMainLooper())
 
-    private val hidePanelRunnable = Runnable { hidePanel() }
+    private val hidePanelRunnable = Runnable { hideAllPanels() }
 
     private var seekHoldDirection = 0
     private var seekHoldStartedAt = 0L
@@ -154,7 +164,7 @@ class PlayerActivity : AppCompatActivity() {
 
         val resolved = resolveIncomingVideo()
         if (resolved == null) {
-            android.widget.Toast.makeText(this, R.string.no_video_link, android.widget.Toast.LENGTH_LONG).show()
+            Toast.makeText(this, R.string.no_video_link, Toast.LENGTH_LONG).show()
             finish()
             return
         }
@@ -165,54 +175,62 @@ class PlayerActivity : AppCompatActivity() {
             statsClient = TorrServerClient(host, TorrServerUrlUtils.schemeOf(streamUrl))
         }
 
-        binding.infoPanel.visibility = View.GONE
+        binding.panelInfo.visibility = View.GONE
+        binding.panelControls.visibility = View.GONE
+        binding.errorBanner.visibility = View.GONE
         binding.textBuffer.visibility = if (prefs.showBufferOverlay) View.VISIBLE else View.GONE
         binding.textVideoInfo.visibility = if (prefs.showBufferOverlay) View.VISIBLE else View.GONE
 
         binding.btnAudio.setOnClickListener { showTrackPicker(C.TRACK_TYPE_AUDIO, "Аудио дорожка") }
         binding.btnSubs.setOnClickListener { showTrackPicker(C.TRACK_TYPE_TEXT, "Субтитры") }
         binding.btnSpeed.setOnClickListener { cycleSpeed() }
-        binding.btnRetry.setOnClickListener { retryPlayback() }
         binding.btnAspect.setOnClickListener { cycleAspect() }
+        binding.btnEpisodes.setOnClickListener { showEpisodesDialog() }
         binding.btnUpdate.setOnClickListener { pendingUpdate?.let { u -> installUpdate(u) } }
+        binding.btnRetry.setOnClickListener { retryPlayback() }
 
         aspectIndex = RESIZE_MODES.indexOf(prefs.resizeMode).coerceAtLeast(0)
         binding.playerView.resizeMode = RESIZE_MODES[aspectIndex]
         binding.btnAspect.text = RESIZE_LABELS[aspectIndex]
 
         checkForUpdateInBackground()
+        loadEpisodesInBackground()
 
         initPlayer()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-            if (event.action == KeyEvent.ACTION_DOWN) togglePanel()
-            return true
-        }
-
-        if (!panelVisible &&
-            (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT || event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT)
-        ) {
-            val direction = if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) 1 else -1
-            when (event.action) {
-                KeyEvent.ACTION_DOWN -> {
-                    if (event.repeatCount == 0) {
-                        seekHoldDirection = direction
-                        seekHoldStartedAt = SystemClock.elapsedRealtime()
-                        performSeek(prefs.seekStepSeconds * direction)
-                        uiHandler.removeCallbacks(seekHoldRunnable)
-                        uiHandler.postDelayed(seekHoldRunnable, 400)
+        when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_DOWN -> {
+                if (event.action == KeyEvent.ACTION_DOWN) togglePanel(Panel.CONTROLS)
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_UP -> {
+                if (event.action == KeyEvent.ACTION_DOWN) togglePanel(Panel.INFO)
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (currentPanel == Panel.NONE) {
+                    val direction = if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) 1 else -1
+                    when (event.action) {
+                        KeyEvent.ACTION_DOWN -> {
+                            if (event.repeatCount == 0) {
+                                seekHoldDirection = direction
+                                seekHoldStartedAt = SystemClock.elapsedRealtime()
+                                performSeek(prefs.seekStepSeconds * direction)
+                                uiHandler.removeCallbacks(seekHoldRunnable)
+                                uiHandler.postDelayed(seekHoldRunnable, 400)
+                            }
+                        }
+                        KeyEvent.ACTION_UP -> {
+                            seekHoldDirection = 0
+                            uiHandler.removeCallbacks(seekHoldRunnable)
+                        }
                     }
-                }
-                KeyEvent.ACTION_UP -> {
-                    seekHoldDirection = 0
-                    uiHandler.removeCallbacks(seekHoldRunnable)
+                    return true
                 }
             }
-            return true
         }
-
         return super.dispatchKeyEvent(event)
     }
 
@@ -232,20 +250,29 @@ class PlayerActivity : AppCompatActivity() {
         p.seekTo(target)
     }
 
-    private fun togglePanel() {
-        if (panelVisible) hidePanel() else showPanel()
+    private fun togglePanel(panel: Panel) {
+        if (currentPanel == panel) hideAllPanels() else showPanel(panel)
     }
 
-    private fun showPanel() {
-        binding.infoPanel.visibility = View.VISIBLE
-        panelVisible = true
+    private fun showPanel(panel: Panel) {
+        binding.panelControls.visibility = if (panel == Panel.CONTROLS) View.VISIBLE else View.GONE
+        binding.panelInfo.visibility = if (panel == Panel.INFO) View.VISIBLE else View.GONE
+        currentPanel = panel
+
+        if (panel == Panel.CONTROLS) {
+            binding.playerView.controllerShowTimeoutMs = PANEL_AUTO_HIDE_MS.toInt()
+            binding.playerView.showController()
+            binding.btnAudio.requestFocus()
+        }
+
         uiHandler.removeCallbacks(hidePanelRunnable)
         uiHandler.postDelayed(hidePanelRunnable, PANEL_AUTO_HIDE_MS)
     }
 
-    private fun hidePanel() {
-        binding.infoPanel.visibility = View.GONE
-        panelVisible = false
+    private fun hideAllPanels() {
+        binding.panelControls.visibility = View.GONE
+        binding.panelInfo.visibility = View.GONE
+        currentPanel = Panel.NONE
         uiHandler.removeCallbacks(hidePanelRunnable)
     }
 
@@ -293,6 +320,28 @@ class PlayerActivity : AppCompatActivity() {
         player = exoPlayer
         binding.playerView.player = exoPlayer
 
+        applyTrackPreferences(exoPlayer)
+
+        speedIndex = closestSpeedIndex(prefs.playbackSpeed)
+        val startSpeed = SPEEDS[speedIndex]
+        exoPlayer.playbackParameters = PlaybackParameters(startSpeed)
+        binding.btnSpeed.text = "${startSpeed}x"
+
+        startPlayback(exoPlayer, streamUrl)
+
+        exoPlayer.addListener(object : Player.Listener {
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                binding.textError.text = "Не удалось воспроизвести (обрыв связи с TorrServer?)\n" +
+                    "Код ошибки: ${error.errorCodeName}"
+                binding.errorBanner.visibility = View.VISIBLE
+            }
+        })
+
+        uiHandler.post(bufferUpdater)
+        uiHandler.post(serverStatsUpdater)
+    }
+
+    private fun applyTrackPreferences(exoPlayer: ExoPlayer) {
         val trackParams = exoPlayer.trackSelectionParameters.buildUpon()
         prefs.preferredAudioLanguage?.let { trackParams.setPreferredAudioLanguage(it) }
         if (prefs.subtitlesEnabled) {
@@ -302,31 +351,14 @@ class PlayerActivity : AppCompatActivity() {
             trackParams.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
         }
         exoPlayer.trackSelectionParameters = trackParams.build()
+    }
 
-        speedIndex = closestSpeedIndex(prefs.playbackSpeed)
-        val startSpeed = SPEEDS[speedIndex]
-        exoPlayer.playbackParameters = PlaybackParameters(startSpeed)
-        binding.btnSpeed.text = "${startSpeed}x"
-
-        val mediaItem = MediaItem.fromUri(streamUrl)
-        val startPos = if (prefs.resumePlayback) prefs.loadPosition(streamUrl) else 0L
-
+    private fun startPlayback(exoPlayer: ExoPlayer, url: String) {
+        val mediaItem = MediaItem.fromUri(url)
+        val startPos = if (prefs.resumePlayback) prefs.loadPosition(url) else 0L
         exoPlayer.setMediaItem(mediaItem, startPos)
         exoPlayer.playWhenReady = true
         exoPlayer.prepare()
-
-        exoPlayer.addListener(object : Player.Listener {
-            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                binding.textBuffer.text = "Не удалось воспроизвести (обрыв связи с TorrServer?)\n" +
-                    "Код ошибки: ${error.errorCodeName}"
-                binding.textBuffer.visibility = View.VISIBLE
-                binding.btnRetry.visibility = View.VISIBLE
-                showPanel()
-            }
-        })
-
-        uiHandler.post(bufferUpdater)
-        uiHandler.post(serverStatsUpdater)
     }
 
     private fun closestSpeedIndex(target: Float): Int {
@@ -343,8 +375,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun retryPlayback() {
-        binding.btnRetry.visibility = View.GONE
-        binding.textBuffer.text = "Повторное подключение…"
+        binding.errorBanner.visibility = View.GONE
         player?.let {
             it.prepare()
             it.playWhenReady = true
@@ -372,3 +403,189 @@ class PlayerActivity : AppCompatActivity() {
                 bestMode = mode
             }
         }
+
+        if (bestDiff < 0.3f && bestMode.modeId != currentMode.modeId) {
+            val attrs = window.attributes
+            attrs.preferredDisplayModeId = bestMode.modeId
+            window.attributes = attrs
+        }
+    }
+
+    private fun checkForUpdateInBackground() {
+        val currentCode = try {
+            val info = packageManager.getPackageInfo(packageName, 0)
+            if (Build.VERSION.SDK_INT >= 28) info.longVersionCode.toInt()
+            else @Suppress("DEPRECATION") info.versionCode
+        } catch (e: Exception) {
+            0
+        }
+
+        lifecycleScope.launch {
+            val update = withContext(Dispatchers.IO) { UpdateChecker.checkForUpdate(currentCode) }
+            if (update != null) {
+                pendingUpdate = update
+                binding.btnUpdate.text = "Обновление ${update.tagName}"
+                binding.btnUpdate.visibility = View.VISIBLE
+            }
+        }
+    }
+
+    private fun installUpdate(update: UpdateInfo) {
+        if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
+            Toast.makeText(
+                this,
+                "Разрешите установку из TorrPlayer в открывшихся настройках, затем нажмите «Обновление» ещё раз",
+                Toast.LENGTH_LONG
+            ).show()
+            startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+            return
+        }
+
+        binding.btnUpdate.isEnabled = false
+        binding.btnUpdate.text = "Скачивание…"
+
+        lifecycleScope.launch {
+            val file = withContext(Dispatchers.IO) { UpdateChecker.downloadApk(this@PlayerActivity, update.downloadUrl) }
+            binding.btnUpdate.isEnabled = true
+
+            if (file == null) {
+                Toast.makeText(this@PlayerActivity, "Не удалось скачать обновление", Toast.LENGTH_LONG).show()
+                binding.btnUpdate.text = "Обновление ${update.tagName}"
+                return@launch
+            }
+
+            val uri = FileProvider.getUriForFile(this@PlayerActivity, "$packageName.fileprovider", file)
+            val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(installIntent)
+        }
+    }
+
+    private fun loadEpisodesInBackground() {
+        val h = hash
+        val client = statsClient
+        if (h == null || client == null) return
+
+        lifecycleScope.launch {
+            val info = withContext(Dispatchers.IO) { try { client.getTorrent(h) } catch (e: Exception) { null } }
+            val files = info?.fileStats.orEmpty()
+                .filter { isVideoFile(it.path) }
+                .sortedBy { it.path }
+            if (files.size > 1) {
+                episodeFiles = files
+                binding.btnEpisodes.visibility = View.VISIBLE
+            }
+        }
+    }
+
+    private fun isVideoFile(path: String): Boolean =
+        path.substringAfterLast('.', "").lowercase() in VIDEO_EXTENSIONS
+
+    private fun showEpisodesDialog() {
+        if (episodeFiles.isEmpty()) return
+        val currentFileName = TorrServerUrlUtils.fileNameOf(streamUrl)
+        val labels = episodeFiles.map { it.path.substringAfterLast('/') }.toTypedArray()
+        val currentIndex = episodeFiles.indexOfFirst { it.path.substringAfterLast('/') == currentFileName }
+
+        AlertDialog.Builder(this)
+            .setTitle("Серии")
+            .setSingleChoiceItems(labels, currentIndex) { dialog, which ->
+                dialog.dismiss()
+                switchToEpisode(episodeFiles[which])
+            }
+            .show()
+    }
+
+    private fun switchToEpisode(file: TorrentFileStat) {
+        val h = hash ?: return
+        val host = TorrServerUrlUtils.hostOf(streamUrl) ?: return
+        val scheme = TorrServerUrlUtils.schemeOf(streamUrl)
+        val fileName = file.path.substringAfterLast('/')
+        val encodedName = URLEncoder.encode(fileName, "UTF-8")
+        val newUrl = "$scheme://$host/stream/$encodedName?link=$h&index=${file.id}&play"
+
+        player?.let { prefs.savePosition(streamUrl, it.currentPosition) }
+
+        streamUrl = newUrl
+        hideAllPanels()
+        binding.errorBanner.visibility = View.GONE
+
+        player?.let { startPlayback(it, streamUrl) }
+    }
+
+    private fun cycleAspect() {
+        aspectIndex = (aspectIndex + 1) % RESIZE_MODES.size
+        binding.playerView.resizeMode = RESIZE_MODES[aspectIndex]
+        binding.btnAspect.text = RESIZE_LABELS[aspectIndex]
+        prefs.resizeMode = RESIZE_MODES[aspectIndex]
+    }
+
+    private fun cycleSpeed() {
+        speedIndex = (speedIndex + 1) % SPEEDS.size
+        val speed = SPEEDS[speedIndex]
+        player?.playbackParameters = PlaybackParameters(speed)
+        binding.btnSpeed.text = "${speed}x"
+        prefs.playbackSpeed = speed
+    }
+
+    private fun showTrackPicker(trackType: Int, dialogTitle: String) {
+        val p = player ?: return
+        val groups = p.currentTracks.groups.filter { it.type == trackType }
+        if (groups.isEmpty()) {
+            AlertDialog.Builder(this).setTitle(dialogTitle).setMessage("Дорожки не найдены").show()
+            return
+        }
+        val labels = mutableListOf("Выключить")
+        val entries = mutableListOf<Pair<Int, Int>?>(null)
+
+        groups.forEachIndexed { groupIndex, group ->
+            for (trackIndex in 0 until group.length) {
+                val format = group.getTrackFormat(trackIndex)
+                labels.add(format.label ?: format.language ?: "Дорожка ${entries.size}")
+                entries.add(groupIndex to trackIndex)
+            }
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(dialogTitle)
+            .setItems(labels.toTypedArray()) { _, which ->
+                val builder = p.trackSelectionParameters.buildUpon()
+                if (which == 0) {
+                    builder.setTrackTypeDisabled(trackType, true)
+                    if (trackType == C.TRACK_TYPE_TEXT) {
+                        prefs.subtitlesEnabled = false
+                        prefs.preferredSubtitleLanguage = null
+                    }
+                } else {
+                    val (groupIndex, trackIndex) = entries[which]!!
+                    val group = groups[groupIndex]
+                    val language = group.getTrackFormat(trackIndex).language
+                    builder.setTrackTypeDisabled(trackType, false)
+                    builder.addOverride(TrackSelectionOverride(group.mediaTrackGroup, trackIndex))
+
+                    if (trackType == C.TRACK_TYPE_AUDIO) {
+                        prefs.preferredAudioLanguage = language
+                    } else if (trackType == C.TRACK_TYPE_TEXT) {
+                        prefs.subtitlesEnabled = true
+                        prefs.preferredSubtitleLanguage = language
+                    }
+                }
+                p.trackSelectionParameters = builder.build()
+            }
+            .show()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        player?.let { prefs.savePosition(streamUrl, it.currentPosition) }
+    }
+
+    override fun onDestroy() {
+        uiHandler.removeCallbacksAndMessages(null)
+        player?.release()
+        player = null
+        super.onDestroy()
+    }
+}
