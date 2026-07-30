@@ -61,6 +61,22 @@
         android:text="@string/resume_playback"
         android:textColor="@color/text_primary" />
 
+    <CheckBox
+        android:id="@+id/check_audio_pcm"
+        android:layout_width="640dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="@string/audio_force_pcm"
+        android:textColor="@color/text_primary" />
+
+    <TextView
+        android:layout_width="640dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/audio_force_pcm_hint"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp" />
+
     <Button
         android:id="@+id/btn_check_update"
         android:layout_width="wrap_content"
