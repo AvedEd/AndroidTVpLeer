@@ -42,57 +42,71 @@
 
     <LinearLayout
         android:id="@+id/panel_controls"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="top|end"
-        android:layout_margin="24dp"
+        android:layout_gravity="bottom"
+        android:layout_marginBottom="90dp"
         android:background="#AA000000"
-        android:orientation="horizontal"
+        android:orientation="vertical"
         android:padding="14dp"
         android:visibility="gone">
 
-        <Button
-            android:id="@+id/btn_audio"
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Аудио" />
+            android:text="Аудио"
+            android:textColor="#AAAAAA"
+            android:textSize="12sp" />
 
-        <Button
-            android:id="@+id/btn_subs"
+        <LinearLayout
+            android:id="@+id/audio_row"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="Субтитры" />
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal" />
 
-        <Button
-            android:id="@+id/btn_speed"
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="1.0x" />
+            android:layout_marginTop="12dp"
+            android:text="Субтитры"
+            android:textColor="#AAAAAA"
+            android:textSize="12sp" />
 
-        <Button
-            android:id="@+id/btn_aspect"
+        <LinearLayout
+            android:id="@+id/subs_row"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="По размеру" />
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal" />
 
-        <Button
-            android:id="@+id/btn_episodes"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="Серии"
-            android:visibility="gone" />
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
 
-        <Button
-            android:id="@+id/btn_update"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="Обновление"
-            android:visibility="gone" />
+            <Button
+                android:id="@+id/btn_speed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="1.0x" />
+
+            <Button
+                android:id="@+id/btn_aspect"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="По размеру" />
+
+            <Button
+                android:id="@+id/btn_episodes"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="Серии"
+                android:visibility="gone" />
+        </LinearLayout>
     </LinearLayout>
 
     <LinearLayout
