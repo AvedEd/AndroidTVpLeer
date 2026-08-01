@@ -101,12 +101,32 @@ class SettingsActivity : AppCompatActivity() {
                 return@launch
             }
 
-            val uri = FileProvider.getUriForFile(this@SettingsActivity, "$packageName.fileprovider", file)
+            val uri = try {
+                FileProvider.getUriForFile(this@SettingsActivity, "$packageName.fileprovider", file)
+            } catch (e: Exception) {
+                Toast.makeText(this@SettingsActivity, "Ошибка FileProvider: ${e.message}", Toast.LENGTH_LONG).show()
+                return@launch
+            }
+
             val installIntent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            startActivity(installIntent)
+
+            if (installIntent.resolveActivity(packageManager) == null) {
+                Toast.makeText(
+                    this@SettingsActivity,
+                    "На приставке не нашлось приложения-установщика APK",
+                    Toast.LENGTH_LONG
+                ).show()
+                return@launch
+            }
+
+            try {
+                startActivity(installIntent)
+            } catch (e: Exception) {
+                Toast.makeText(this@SettingsActivity, "Не удалось запустить установку: ${e.message}", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
