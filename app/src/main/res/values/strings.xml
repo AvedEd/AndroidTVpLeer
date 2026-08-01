@@ -15,6 +15,12 @@
     <string name="show_buffer">Показывать индикатор буфера</string>
     <string name="resume_playback">Продолжать с места остановки</string>
     <string name="test_connection">Проверить соединение</string>
+    <string name="check_update">Проверить обновление</string>
     <string name="connection_ok">Соединение успешно</string>
     <string name="connection_fail">Не удалось подключиться</string>
+    <string name="update_checking">Проверка обновлений…</string>
+    <string name="update_latest">У вас установлена последняя версия</string>
+    <string name="update_found">Доступно обновление. Скачиваем и устанавливаем…</string>
+    <string name="update_download_failed">Не удалось скачать обновление</string>
+    <string name="update_install_denied">Чтобы установить обновление, включите "Неизвестные источники" для TorrPlayer</string>
 </resources>

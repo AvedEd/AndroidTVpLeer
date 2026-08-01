@@ -26,20 +26,33 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build debug APK
-        run: gradle assembleDebug --stacktrace
+      - name: Decode keystore
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.TORTPLAYER_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.TORTPLAYER_KEYSTORE_BASE64 }}" | base64 --decode > keystore.jks
+            echo "TORTPLAYER_KEYSTORE_FILE=$PWD/keystore.jks" >> "$GITHUB_ENV"
+          fi
 
-      - name: Upload build artifact (backup download route)
+      - name: Build signed release APK
+        env:
+          TORTPLAYER_KEYSTORE_FILE: ${{ env.TORTPLAYER_KEYSTORE_FILE }}
+          TORTPLAYER_KEYSTORE_PASSWORD: ${{ secrets.TORTPLAYER_KEYSTORE_PASSWORD }}
+          TORTPLAYER_KEY_ALIAS: ${{ secrets.TORTPLAYER_KEY_ALIAS }}
+          TORTPLAYER_KEY_PASSWORD: ${{ secrets.TORTPLAYER_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TorrPlayer-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: TorrPlayer-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
 
       - name: Publish GitHub Release with direct APK link
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: TorrPlayer build ${{ github.run_number }}
-          files: app/build/outputs/apk/debug/app-debug.apk
+          files: app/build/outputs/apk/release/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

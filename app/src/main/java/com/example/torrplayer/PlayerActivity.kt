@@ -53,6 +53,7 @@ class PlayerActivity : AppCompatActivity() {
     private var hash: String? = null
     private var speedIndex = 2 // 1.0x
     private var panelVisible = false
+    private var serverStatusText: String? = null
 
     private val uiHandler = Handler(Looper.getMainLooper())
 
@@ -64,13 +65,7 @@ class PlayerActivity : AppCompatActivity() {
     // при открытии панели данные уже готовы и не нужно ждать первого тика.
     private val bufferUpdater = object : Runnable {
         override fun run() {
-            player?.let {
-                val bufferedPct = it.bufferedPercentage
-                val posMs = it.currentPosition
-                val durMs = if (it.duration > 0) it.duration else 0
-                binding.textBuffer.text = "Буфер: $bufferedPct%\n" +
-                    "${Formatting.time(posMs)} / ${Formatting.time(durMs)}"
-            }
+            renderStatusText()
             uiHandler.postDelayed(this, 1000)
         }
     }
@@ -84,10 +79,12 @@ class PlayerActivity : AppCompatActivity() {
                 lifecycleScope.launch {
                     val info = try { client.getTorrent(h) } catch (e: Exception) { null }
                     val stat = info?.stat
-                    if (stat != null) {
-                        val extra = "\n↓ ${Formatting.speed(stat.downloadSpeed)}  Пиры: ${stat.peers ?: 0}"
-                        binding.textBuffer.append(extra)
+                    serverStatusText = if (stat != null) {
+                        "↓ ${Formatting.speed(stat.downloadSpeed)}  Пиры: ${stat.peers ?: 0}"
+                    } else {
+                        null
                     }
+                    renderStatusText()
                 }
             }
             uiHandler.postDelayed(this, 4000)
@@ -119,7 +116,7 @@ class PlayerActivity : AppCompatActivity() {
         // Панель (буфер + аудио/субтитры/скорость) по умолчанию скрыта — ничего не
         // загромождает экран. Открывается кнопкой "вниз" на пульте (см. dispatchKeyEvent).
         binding.infoPanel.visibility = View.GONE
-        binding.textBuffer.visibility = if (prefs.showBufferOverlay) View.VISIBLE else View.GONE
+        updateInfoVisibility()
 
         binding.btnAudio.setOnClickListener { showTrackPicker(C.TRACK_TYPE_AUDIO, "Аудио дорожка") }
         binding.btnSubs.setOnClickListener { showTrackPicker(C.TRACK_TYPE_TEXT, "Субтитры") }
@@ -133,11 +130,62 @@ class PlayerActivity : AppCompatActivity() {
      * (вместо того, чтобы она постоянно висела на экране поверх видео).
      */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-            if (event.action == KeyEvent.ACTION_DOWN) togglePanel()
-            return true
+        when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_BUTTON_Y -> {
+                if (event.action == KeyEvent.ACTION_DOWN) togglePanel()
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_DOWN -> {
+                if (event.action == KeyEvent.ACTION_DOWN) togglePanel()
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    seekByStep(-(prefs.seekStepSeconds * 1000L))
+                    return true
+                }
+            }
+            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    seekByStep(prefs.seekStepSeconds * 1000L)
+                    return true
+                }
+            }
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+            KeyEvent.KEYCODE_MEDIA_STOP -> {
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    togglePlayback()
+                    return true
+                }
+            }
+            KeyEvent.KEYCODE_BACK -> {
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    if (panelVisible) {
+                        hidePanel()
+                        return true
+                    }
+                }
+            }
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    private fun togglePlayback() {
+        player?.let {
+            if (it.isPlaying) it.pause() else it.play()
+        }
+    }
+
+    private fun seekByStep(deltaMs: Long) {
+        val p = player ?: return
+        val newPos = (p.currentPosition + deltaMs).coerceIn(0L, if (p.duration > 0) p.duration else Long.MAX_VALUE)
+        p.seekTo(newPos)
+        if (prefs.showBufferOverlay || panelVisible) {
+            val direction = if (deltaMs >= 0) "Вперёд" else "Назад"
+            binding.textBuffer.text = "$direction ${Formatting.time(kotlin.math.abs(deltaMs))}"
+        }
     }
 
     private fun togglePanel() {
@@ -147,6 +195,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun showPanel() {
         binding.infoPanel.visibility = View.VISIBLE
         panelVisible = true
+        updateInfoVisibility()
         uiHandler.removeCallbacks(hidePanelRunnable)
         uiHandler.postDelayed(hidePanelRunnable, PANEL_AUTO_HIDE_MS)
     }
@@ -154,7 +203,28 @@ class PlayerActivity : AppCompatActivity() {
     private fun hidePanel() {
         binding.infoPanel.visibility = View.GONE
         panelVisible = false
+        updateInfoVisibility()
         uiHandler.removeCallbacks(hidePanelRunnable)
+    }
+
+    private fun updateInfoVisibility() {
+        binding.textBuffer.visibility = if (prefs.showBufferOverlay || panelVisible) View.VISIBLE else View.GONE
+    }
+
+    private fun renderStatusText() {
+        val info = StringBuilder()
+        player?.let {
+            val bufferedPct = it.bufferedPercentage
+            val posMs = it.currentPosition
+            val durMs = if (it.duration > 0) it.duration else 0
+            info.append("Буфер: $bufferedPct%\n")
+            info.append("${Formatting.time(posMs)} / ${Formatting.time(durMs)}")
+        }
+        serverStatusText?.let {
+            if (info.isNotEmpty()) info.append("\n")
+            info.append(it)
+        }
+        binding.textBuffer.text = info.toString().ifEmpty { "Подготовка к воспроизведению…" }
     }
 
     /**
@@ -255,8 +325,14 @@ class PlayerActivity : AppCompatActivity() {
             .show()
     }
 
+    override fun onStart() {
+        super.onStart()
+        player?.play()
+    }
+
     override fun onStop() {
         super.onStop()
+        player?.pause()
         // Запоминаем позицию, чтобы при повторном открытии этого же файла продолжить с места остановки.
         player?.let { prefs.savePosition(streamUrl, it.currentPosition) }
     }

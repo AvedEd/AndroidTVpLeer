@@ -1,6 +1,18 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+}
+
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = if (keystorePropertiesFile.exists()) {
+    Properties().apply {
+        FileInputStream(keystorePropertiesFile).use { load(it) }
+    }
+} else {
+    Properties()
 }
 
 android {
@@ -15,10 +27,35 @@ android {
         versionName = "1.0"
     }
 
+    signingConfigs {
+        create("release") {
+            val envStoreFile = System.getenv("TORTPLAYER_KEYSTORE_FILE")
+            val envStorePassword = System.getenv("TORTPLAYER_KEYSTORE_PASSWORD")
+            val envKeyAlias = System.getenv("TORTPLAYER_KEY_ALIAS")
+            val envKeyPassword = System.getenv("TORTPLAYER_KEY_PASSWORD")
+
+            if (keystorePropertiesFile.exists()) {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            } else if (!envStoreFile.isNullOrBlank()) {
+                storeFile = file(envStoreFile)
+                storePassword = envStorePassword
+                keyAlias = envKeyAlias
+                keyPassword = envKeyPassword
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
