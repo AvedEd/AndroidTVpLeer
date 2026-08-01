@@ -12,6 +12,13 @@
         android:name="android.hardware.touchscreen"
         android:required="false" />
 
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/vnd.android.package-archive" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="true"
         android:banner="@drawable/banner"
@@ -20,7 +27,6 @@
         android:theme="@style/Theme.TorrPlayer"
         android:usesCleartextTraffic="true">
 
-        <!-- Стартовый экран (открывается только вручную с ТВ-лаунчера, для настроек). -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -38,13 +44,6 @@
             android:theme="@style/Theme.TorrPlayer"
             android:screenOrientation="landscape" />
 
-        <!--
-          Экран воспроизведения. exported="true" и intent-filter ниже — это то, что
-          заставляет TorrPlayer появиться в списке "Выбрать плеер" в Lampa (и в
-          системном диалоге выбора приложения для видео-ссылок вообще).
-          Lampa запускает внешний плеер обычным Intent.ACTION_VIEW с прямой ссылкой
-          на поток TorrServer, поэтому отдельная явная связь с Lampa не нужна.
-        -->
         <activity
             android:name=".PlayerActivity"
             android:exported="true"
@@ -68,11 +67,6 @@
                 <data android:mimeType="video/*" />
             </intent-filter>
 
-            <!--
-              Доп. фильтр по расширению файла в самой ссылке (как у DDD Player и
-              подобных плееров) — подхватывает ссылку, даже если вызывающее
-              приложение не проставило mimeType="video/*" на интенте.
-            -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -129,8 +123,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Нужен, чтобы безопасно передать скачанный APK-файл системному установщику
-             (Android с версии 7 запрещает передавать голый file:// путь другим приложениям). -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
