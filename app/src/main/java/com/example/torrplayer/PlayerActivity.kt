@@ -2,18 +2,17 @@ package com.example.torrplayer
 
 import android.app.AlertDialog
 import android.content.Intent
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.provider.Settings
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
+import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -33,8 +32,6 @@ import com.example.torrplayer.torrserver.TorrServerClient
 import com.example.torrplayer.torrserver.TorrentFileStat
 import com.example.torrplayer.util.Formatting
 import com.example.torrplayer.util.TorrServerUrlUtils
-import com.example.torrplayer.util.UpdateChecker
-import com.example.torrplayer.util.UpdateInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -49,6 +46,7 @@ class PlayerActivity : AppCompatActivity() {
 
         private val SPEEDS = floatArrayOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
         private const val PANEL_AUTO_HIDE_MS = 6000L
+        private const val BACK_EXIT_WINDOW_MS = 2000L
 
         private val RESIZE_MODES = intArrayOf(
             AspectRatioFrameLayout.RESIZE_MODE_FIT,
@@ -88,7 +86,7 @@ class PlayerActivity : AppCompatActivity() {
     private var aspectIndex = 0
     private var currentPanel = Panel.NONE
     private var lastAppliedFrameRate = 0f
-    private var pendingUpdate: UpdateInfo? = null
+    private var lastBackPressAt = 0L
     private var episodeFiles: List<TorrentFileStat> = emptyList()
 
     private val uiHandler = Handler(Looper.getMainLooper())
@@ -181,19 +179,15 @@ class PlayerActivity : AppCompatActivity() {
         binding.textBuffer.visibility = if (prefs.showBufferOverlay) View.VISIBLE else View.GONE
         binding.textVideoInfo.visibility = if (prefs.showBufferOverlay) View.VISIBLE else View.GONE
 
-        binding.btnAudio.setOnClickListener { showTrackPicker(C.TRACK_TYPE_AUDIO, "Аудио дорожка") }
-        binding.btnSubs.setOnClickListener { showTrackPicker(C.TRACK_TYPE_TEXT, "Субтитры") }
         binding.btnSpeed.setOnClickListener { cycleSpeed() }
         binding.btnAspect.setOnClickListener { cycleAspect() }
         binding.btnEpisodes.setOnClickListener { showEpisodesDialog() }
-        binding.btnUpdate.setOnClickListener { pendingUpdate?.let { u -> installUpdate(u) } }
         binding.btnRetry.setOnClickListener { retryPlayback() }
 
         aspectIndex = RESIZE_MODES.indexOf(prefs.resizeMode).coerceAtLeast(0)
         binding.playerView.resizeMode = RESIZE_MODES[aspectIndex]
         binding.btnAspect.text = RESIZE_LABELS[aspectIndex]
 
-        checkForUpdateInBackground()
         loadEpisodesInBackground()
 
         initPlayer()
@@ -202,15 +196,19 @@ class PlayerActivity : AppCompatActivity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         when (event.keyCode) {
             KeyEvent.KEYCODE_DPAD_DOWN -> {
-                if (event.action == KeyEvent.ACTION_DOWN) togglePanel(Panel.CONTROLS)
-                return true
+                if (event.action == KeyEvent.ACTION_DOWN && currentPanel != Panel.CONTROLS) {
+                    togglePanel(Panel.CONTROLS)
+                    return true
+                }
             }
             KeyEvent.KEYCODE_DPAD_UP -> {
-                if (event.action == KeyEvent.ACTION_DOWN) togglePanel(Panel.INFO)
-                return true
+                if (event.action == KeyEvent.ACTION_DOWN && currentPanel != Panel.INFO && currentPanel != Panel.CONTROLS) {
+                    togglePanel(Panel.INFO)
+                    return true
+                }
             }
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                if (currentPanel == Panel.NONE) {
+                if (currentPanel == Panel.NONE || (currentPanel == Panel.CONTROLS && isTimeBarFocused())) {
                     val direction = if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) 1 else -1
                     when (event.action) {
                         KeyEvent.ACTION_DOWN -> {
@@ -232,6 +230,25 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    private fun isTimeBarFocused(): Boolean {
+        val timeBar = binding.playerView.findViewById<View>(androidx.media3.ui.R.id.exo_progress)
+        return timeBar?.hasFocus() == true
+    }
+
+    override fun onBackPressed() {
+        if (currentPanel != Panel.NONE) {
+            hideAllPanels()
+            return
+        }
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastBackPressAt <= BACK_EXIT_WINDOW_MS) {
+            super.onBackPressed()
+        } else {
+            lastBackPressAt = now
+            Toast.makeText(this, "Нажмите «Назад» ещё раз для выхода", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun seekStepForHold(heldMs: Long): Int {
@@ -260,9 +277,11 @@ class PlayerActivity : AppCompatActivity() {
         currentPanel = panel
 
         if (panel == Panel.CONTROLS) {
+            populateAudioRow()
+            populateSubsRow()
             binding.playerView.controllerShowTimeoutMs = PANEL_AUTO_HIDE_MS.toInt()
             binding.playerView.showController()
-            binding.btnAudio.requestFocus()
+            binding.playerView.findViewById<View>(androidx.media3.ui.R.id.exo_progress)?.requestFocus()
         }
 
         uiHandler.removeCallbacks(hidePanelRunnable)
@@ -274,6 +293,82 @@ class PlayerActivity : AppCompatActivity() {
         binding.panelInfo.visibility = View.GONE
         currentPanel = Panel.NONE
         uiHandler.removeCallbacks(hidePanelRunnable)
+    }
+
+    private fun dpToPx(dp: Int): Int = (dp * resources.displayMetrics.density).toInt()
+
+    private fun populateAudioRow() {
+        binding.audioRow.removeAllViews()
+        val p = player ?: return
+        val groups = p.currentTracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
+        var first = true
+        groups.forEach { group ->
+            for (trackIndex in 0 until group.length) {
+                val format = group.getTrackFormat(trackIndex)
+                val selected = group.isTrackSelected(trackIndex)
+                val label = format.label ?: format.language ?: "Дорожка"
+                val btn = Button(this).apply {
+                    text = if (selected) "● $label" else label
+                    setOnClickListener {
+                        val builder = p.trackSelectionParameters.buildUpon()
+                        builder.setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
+                        builder.addOverride(TrackSelectionOverride(group.mediaTrackGroup, trackIndex))
+                        p.trackSelectionParameters = builder.build()
+                        prefs.preferredAudioLanguage = format.language
+                        populateAudioRow()
+                    }
+                }
+                val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                if (!first) lp.marginStart = dpToPx(8)
+                btn.layoutParams = lp
+                binding.audioRow.addView(btn)
+                first = false
+            }
+        }
+    }
+
+    private fun populateSubsRow() {
+        binding.subsRow.removeAllViews()
+        val p = player ?: return
+        val groups = p.currentTracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
+        val anySelected = groups.any { g -> (0 until g.length).any { g.isTrackSelected(it) } }
+
+        val offBtn = Button(this).apply {
+            text = if (!anySelected) "● Выкл" else "Выкл"
+            setOnClickListener {
+                val builder = p.trackSelectionParameters.buildUpon()
+                builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                p.trackSelectionParameters = builder.build()
+                prefs.subtitlesEnabled = false
+                prefs.preferredSubtitleLanguage = null
+                populateSubsRow()
+            }
+        }
+        binding.subsRow.addView(offBtn)
+
+        groups.forEach { group ->
+            for (trackIndex in 0 until group.length) {
+                val format = group.getTrackFormat(trackIndex)
+                val selected = group.isTrackSelected(trackIndex)
+                val label = format.label ?: format.language ?: "Субтитры"
+                val btn = Button(this).apply {
+                    text = if (selected) "● $label" else label
+                    setOnClickListener {
+                        val builder = p.trackSelectionParameters.buildUpon()
+                        builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                        builder.addOverride(TrackSelectionOverride(group.mediaTrackGroup, trackIndex))
+                        p.trackSelectionParameters = builder.build()
+                        prefs.subtitlesEnabled = true
+                        prefs.preferredSubtitleLanguage = format.language
+                        populateSubsRow()
+                    }
+                }
+                val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                lp.marginStart = dpToPx(8)
+                btn.layoutParams = lp
+                binding.subsRow.addView(btn)
+            }
+        }
     }
 
     private fun resolveIncomingVideo(): Pair<String, String?>? {
@@ -339,6 +434,13 @@ class PlayerActivity : AppCompatActivity() {
                 binding.textError.text = "Не удалось воспроизвести (обрыв связи с TorrServer?)\n" +
                     "Код ошибки: ${error.errorCodeName}"
                 binding.errorBanner.visibility = View.VISIBLE
+            }
+
+            override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                if (currentPanel == Panel.CONTROLS) {
+                    populateAudioRow()
+                    populateSubsRow()
+                }
             }
         })
 
@@ -416,58 +518,6 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkForUpdateInBackground() {
-        val currentCode = try {
-            val info = packageManager.getPackageInfo(packageName, 0)
-            if (Build.VERSION.SDK_INT >= 28) info.longVersionCode.toInt()
-            else @Suppress("DEPRECATION") info.versionCode
-        } catch (e: Exception) {
-            0
-        }
-
-        lifecycleScope.launch {
-            val update = withContext(Dispatchers.IO) { UpdateChecker.checkForUpdate(currentCode) }
-            if (update != null) {
-                pendingUpdate = update
-                binding.btnUpdate.text = "Обновление ${update.tagName}"
-                binding.btnUpdate.visibility = View.VISIBLE
-            }
-        }
-    }
-
-    private fun installUpdate(update: UpdateInfo) {
-        if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
-            Toast.makeText(
-                this,
-                "Разрешите установку из TorrPlayer в открывшихся настройках, затем нажмите «Обновление» ещё раз",
-                Toast.LENGTH_LONG
-            ).show()
-            startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
-            return
-        }
-
-        binding.btnUpdate.isEnabled = false
-        binding.btnUpdate.text = "Скачивание…"
-
-        lifecycleScope.launch {
-            val file = withContext(Dispatchers.IO) { UpdateChecker.downloadApk(this@PlayerActivity, update.downloadUrl) }
-            binding.btnUpdate.isEnabled = true
-
-            if (file == null) {
-                Toast.makeText(this@PlayerActivity, "Не удалось скачать обновление", Toast.LENGTH_LONG).show()
-                binding.btnUpdate.text = "Обновление ${update.tagName}"
-                return@launch
-            }
-
-            val uri = FileProvider.getUriForFile(this@PlayerActivity, "$packageName.fileprovider", file)
-            val installIntent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            startActivity(installIntent)
-        }
-    }
-
     private fun loadEpisodesInBackground() {
         val h = hash
         val client = statsClient
@@ -533,53 +583,6 @@ class PlayerActivity : AppCompatActivity() {
         player?.playbackParameters = PlaybackParameters(speed)
         binding.btnSpeed.text = "${speed}x"
         prefs.playbackSpeed = speed
-    }
-
-    private fun showTrackPicker(trackType: Int, dialogTitle: String) {
-        val p = player ?: return
-        val groups = p.currentTracks.groups.filter { it.type == trackType }
-        if (groups.isEmpty()) {
-            AlertDialog.Builder(this).setTitle(dialogTitle).setMessage("Дорожки не найдены").show()
-            return
-        }
-        val labels = mutableListOf("Выключить")
-        val entries = mutableListOf<Pair<Int, Int>?>(null)
-
-        groups.forEachIndexed { groupIndex, group ->
-            for (trackIndex in 0 until group.length) {
-                val format = group.getTrackFormat(trackIndex)
-                labels.add(format.label ?: format.language ?: "Дорожка ${entries.size}")
-                entries.add(groupIndex to trackIndex)
-            }
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle(dialogTitle)
-            .setItems(labels.toTypedArray()) { _, which ->
-                val builder = p.trackSelectionParameters.buildUpon()
-                if (which == 0) {
-                    builder.setTrackTypeDisabled(trackType, true)
-                    if (trackType == C.TRACK_TYPE_TEXT) {
-                        prefs.subtitlesEnabled = false
-                        prefs.preferredSubtitleLanguage = null
-                    }
-                } else {
-                    val (groupIndex, trackIndex) = entries[which]!!
-                    val group = groups[groupIndex]
-                    val language = group.getTrackFormat(trackIndex).language
-                    builder.setTrackTypeDisabled(trackType, false)
-                    builder.addOverride(TrackSelectionOverride(group.mediaTrackGroup, trackIndex))
-
-                    if (trackType == C.TRACK_TYPE_AUDIO) {
-                        prefs.preferredAudioLanguage = language
-                    } else if (trackType == C.TRACK_TYPE_TEXT) {
-                        prefs.subtitlesEnabled = true
-                        prefs.preferredSubtitleLanguage = language
-                    }
-                }
-                p.trackSelectionParameters = builder.build()
-            }
-            .show()
     }
 
     override fun onStop() {
