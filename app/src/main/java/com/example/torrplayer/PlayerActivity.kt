@@ -2,6 +2,7 @@ package com.example.torrplayer
 
 import android.app.AlertDialog
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -16,6 +17,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
@@ -88,6 +90,11 @@ class PlayerActivity : AppCompatActivity() {
     private var lastAppliedFrameRate = 0f
     private var lastBackPressAt = 0L
     private var episodeFiles: List<TorrentFileStat> = emptyList()
+
+    private var incomingTitle: String? = null
+    private var externalStartPositionMs: Long? = null
+    private var externalSubtitles: List<Uri> = emptyList()
+    private var shouldReturnResult = false
 
     private val uiHandler = Handler(Looper.getMainLooper())
 
@@ -169,6 +176,8 @@ class PlayerActivity : AppCompatActivity() {
         streamUrl = resolved.first
         hash = resolved.second
 
+        parseExternalPlayerExtras()
+
         TorrServerUrlUtils.hostOf(streamUrl)?.let { host ->
             statsClient = TorrServerClient(host, TorrServerUrlUtils.schemeOf(streamUrl))
         }
@@ -178,6 +187,12 @@ class PlayerActivity : AppCompatActivity() {
         binding.errorBanner.visibility = View.GONE
         binding.textBuffer.visibility = if (prefs.showBufferOverlay) View.VISIBLE else View.GONE
         binding.textVideoInfo.visibility = if (prefs.showBufferOverlay) View.VISIBLE else View.GONE
+
+        incomingTitle?.let { title ->
+            binding.textTitle.text = title
+            binding.textTitle.visibility = View.VISIBLE
+            uiHandler.postDelayed({ binding.textTitle.visibility = View.GONE }, 5000)
+        }
 
         binding.btnSpeed.setOnClickListener { cycleSpeed() }
         binding.btnAspect.setOnClickListener { cycleAspect() }
@@ -244,11 +259,39 @@ class PlayerActivity : AppCompatActivity() {
         }
         val now = SystemClock.elapsedRealtime()
         if (now - lastBackPressAt <= BACK_EXIT_WINDOW_MS) {
-            super.onBackPressed()
+            reportResultAndFinish()
         } else {
             lastBackPressAt = now
             Toast.makeText(this, "Нажмите «Назад» ещё раз для выхода", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun parseExternalPlayerExtras() {
+        incomingTitle = intent.getStringExtra("title")
+
+        val pos = intent.getIntExtra("position", -1)
+        if (pos >= 0) externalStartPositionMs = pos.toLong()
+
+        shouldReturnResult = intent.getBooleanExtra("return_result", false)
+
+        externalSubtitles = try {
+            @Suppress("DEPRECATION")
+            intent.getParcelableArrayListExtra<Uri>("subs").orEmpty()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun reportResultAndFinish() {
+        if (shouldReturnResult) {
+            val result = Intent()
+            player?.let {
+                result.putExtra("position", it.currentPosition.toInt())
+                result.putExtra("duration", it.duration.coerceAtLeast(0).toInt())
+            }
+            setResult(RESULT_OK, result)
+        }
+        finish()
     }
 
     private fun seekStepForHold(heldMs: Long): Int {
@@ -442,6 +485,12 @@ class PlayerActivity : AppCompatActivity() {
                     populateSubsRow()
                 }
             }
+
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_ENDED) {
+                    reportResultAndFinish()
+                }
+            }
         })
 
         uiHandler.post(bufferUpdater)
@@ -461,11 +510,40 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun startPlayback(exoPlayer: ExoPlayer, url: String) {
-        val mediaItem = MediaItem.fromUri(url)
-        val startPos = if (prefs.resumePlayback) prefs.loadPosition(url) else 0L
+        val mediaItem = buildMediaItem(url)
+
+        val startPos = externalStartPositionMs
+            ?: if (prefs.resumePlayback) prefs.loadPosition(url) else 0L
+        externalStartPositionMs = null
+        externalSubtitles = emptyList()
+
         exoPlayer.setMediaItem(mediaItem, startPos)
         exoPlayer.playWhenReady = true
         exoPlayer.prepare()
+    }
+
+    private fun buildMediaItem(url: String): MediaItem {
+        val builder = MediaItem.Builder().setUri(url)
+        if (externalSubtitles.isNotEmpty()) {
+            val configs = externalSubtitles.mapIndexed { index, uri ->
+                MediaItem.SubtitleConfiguration.Builder(uri)
+                    .setMimeType(guessSubtitleMime(uri))
+                    .setLabel("Субтитры ${index + 1}")
+                    .setLanguage("ext$index")
+                    .build()
+            }
+            builder.setSubtitleConfigurations(configs)
+        }
+        return builder.build()
+    }
+
+    private fun guessSubtitleMime(uri: Uri): String {
+        val path = uri.toString().lowercase()
+        return when {
+            path.endsWith(".vtt") -> MimeTypes.TEXT_VTT
+            path.endsWith(".ass") || path.endsWith(".ssa") -> MimeTypes.TEXT_SSA
+            else -> MimeTypes.APPLICATION_SUBRIP
+        }
     }
 
     private fun closestSpeedIndex(target: Float): Int {
