@@ -93,7 +93,8 @@ class PlayerActivity : AppCompatActivity() {
 
     private var incomingTitle: String? = null
     private var externalStartPositionMs: Long? = null
-    private var externalSubtitles: List<Uri> = emptyList()
+    private var externalSubtitles: List<Pair<Uri, String?>> = emptyList()
+    private var externalHeaders: Map<String, String> = emptyMap()
     private var shouldReturnResult = false
 
     private val uiHandler = Handler(Looper.getMainLooper())
@@ -268,17 +269,35 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun parseExternalPlayerExtras() {
         incomingTitle = intent.getStringExtra("title")
+            ?: intent.getStringExtra("android.intent.extra.TITLE")
+            ?: intent.getStringExtra("filename")
 
         val pos = intent.getIntExtra("position", -1)
         if (pos >= 0) externalStartPositionMs = pos.toLong()
 
         shouldReturnResult = intent.getBooleanExtra("return_result", false)
 
-        externalSubtitles = try {
+        val subUris = try {
             @Suppress("DEPRECATION")
-            intent.getParcelableArrayListExtra<Uri>("subs").orEmpty()
+            intent.getParcelableArrayListExtra<Uri>("subs")
+                ?: (intent.getParcelableArrayExtra("subs")?.mapNotNull { it as? Uri })
         } catch (e: Exception) {
-            emptyList()
+            null
+        }.orEmpty()
+        val subNames = intent.getStringArrayExtra("subs.name")
+        externalSubtitles = subUris.mapIndexed { index, uri -> uri to subNames?.getOrNull(index) }
+
+        val headersArray = intent.getStringArrayExtra("headers")
+        externalHeaders = if (headersArray != null) {
+            val map = mutableMapOf<String, String>()
+            var i = 0
+            while (i + 1 < headersArray.size) {
+                map[headersArray[i]] = headersArray[i + 1]
+                i += 2
+            }
+            map
+        } else {
+            emptyMap()
         }
     }
 
@@ -449,6 +468,9 @@ class PlayerActivity : AppCompatActivity() {
             .setConnectTimeoutMs(HTTP_CONNECT_TIMEOUT_MS)
             .setReadTimeoutMs(HTTP_READ_TIMEOUT_MS)
             .setAllowCrossProtocolRedirects(true)
+        if (externalHeaders.isNotEmpty()) {
+            httpDataSourceFactory.setDefaultRequestProperties(externalHeaders)
+        }
         val mediaSourceFactory = DefaultMediaSourceFactory(
             DefaultDataSource.Factory(this, httpDataSourceFactory)
         )
@@ -525,10 +547,10 @@ class PlayerActivity : AppCompatActivity() {
     private fun buildMediaItem(url: String): MediaItem {
         val builder = MediaItem.Builder().setUri(url)
         if (externalSubtitles.isNotEmpty()) {
-            val configs = externalSubtitles.mapIndexed { index, uri ->
+            val configs = externalSubtitles.mapIndexed { index, (uri, name) ->
                 MediaItem.SubtitleConfiguration.Builder(uri)
                     .setMimeType(guessSubtitleMime(uri))
-                    .setLabel("Субтитры ${index + 1}")
+                    .setLabel(name ?: "Субтитры ${index + 1}")
                     .setLanguage("ext$index")
                     .build()
             }
