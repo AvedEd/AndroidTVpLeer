@@ -52,16 +52,22 @@ class AppPrefs(context: Context) {
         set(value) = sp.edit().putBoolean(KEY_AUTO_NEXT, value).apply()
 
     /**
-     * true — всегда декодировать сложный звук (AC-3/DTS/TrueHD и т.п.) в PCM самим плеером,
-     * не полагаясь на "проброс" (passthrough) через HDMI. Лучше подходит для ТВ без eARC,
-     * где обычный ARC не пропускает TrueHD/DTS-HD/lossless Atmos целиком.
-     * false — предпочитать проброс исходного потока как есть, если система его поддерживает
-     * (актуально для тех, у кого ТВ/ресивер с eARC).
-     * Включено по умолчанию — большинство ТВ пока без eARC.
+     * Режим декодирования сложного звука (AC-3/DTS/TrueHD и т.п.):
+     * 0 = АВТО — пытаться пробросить поток как есть на ТВ/ресивер (лучший вариант, если есть eARC).
+     * 1 = ВСЕГДА PCM — декодировать в PCM собственным FFmpeg-декодером (надёжнее без eARC). По умолчанию.
+     * 2 = PCM ТОЛЬКО ПРИ СБОЕ — сначала пробовать проброс/аппаратный декодер, PCM только если не вышло.
      */
-    var audioForcePcm: Boolean
-        get() = sp.getBoolean(KEY_AUDIO_FORCE_PCM, true)
-        set(value) = sp.edit().putBoolean(KEY_AUDIO_FORCE_PCM, value).apply()
+    var audioDecodeMode: Int
+        get() = sp.getInt(KEY_AUDIO_DECODE_MODE, 1)
+        set(value) = sp.edit().putInt(KEY_AUDIO_DECODE_MODE, value).apply()
+
+    /**
+     * Кодировка внешних .srt субтитров. null — определять автоматически.
+     * Значение — имя Java-кодировки (например "windows-1251", "koi8-r", "UTF-8").
+     */
+    var subtitleCharset: String?
+        get() = sp.getString(KEY_SUBTITLE_CHARSET, null)
+        set(value) = sp.edit().putString(KEY_SUBTITLE_CHARSET, value).apply()
 
     fun savePosition(streamUrl: String, positionMs: Long) {
         sp.edit().putLong(posKey(streamUrl), positionMs).apply()
@@ -82,7 +88,8 @@ class AppPrefs(context: Context) {
         private const val KEY_SUB_ENABLED = "subtitles_enabled"
         private const val KEY_SPEED = "playback_speed"
         private const val KEY_RESIZE_MODE = "resize_mode"
-        private const val KEY_AUDIO_FORCE_PCM = "audio_force_pcm"
+        private const val KEY_AUDIO_DECODE_MODE = "audio_decode_mode"
+        private const val KEY_SUBTITLE_CHARSET = "subtitle_charset"
         private const val KEY_AUTO_NEXT = "auto_next_episode"
     }
 }
