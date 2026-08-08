@@ -15,10 +15,12 @@
     <string name="show_buffer">Показывать индикатор буфера</string>
     <string name="resume_playback">Продолжать с места остановки</string>
     <string name="auto_next_episode">Автоматически включать следующую серию</string>
-    <string name="audio_force_pcm">Всегда декодировать сложный звук (AC-3/DTS/TrueHD) в PCM</string>
-    <string name="audio_force_pcm_hint">Включено — надёжнее для ТВ без eARC (обычный ARC не пропускает
-        TrueHD/DTS-HD целиком). Выключите, если у вас ТВ/ресивер с eARC и хотите честный
-        проброс потока как есть.</string>
+    <string name="audio_decode_mode">Режим сложного звука (AC-3/DTS/TrueHD)</string>
+    <string name="audio_decode_mode_hint">«Всегда PCM» надёжнее для ТВ без eARC. «Авто» — пробовать честный проброс потока,
+        если у вас ТВ/ресивер с eARC. «PCM при сбое» — среднее между ними.</string>
+    <string name="subtitle_charset">Кодировка внешних субтитров (.srt)</string>
+    <string name="subtitle_charset_hint">Если вместо русского текста в субтитрах видите кракозябры — переключите
+        кодировку здесь. Большинство старых .srt в раздачах сохранены в Windows-1251.</string>
     <string name="test_connection">Проверить соединение</string>
     <string name="check_update">Проверить обновления</string>
     <string name="no_update">Обновлений не найдено — установлена последняя версия</string>
