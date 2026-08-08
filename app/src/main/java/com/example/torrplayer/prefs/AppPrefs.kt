@@ -44,6 +44,14 @@ class AppPrefs(context: Context) {
         set(value) = sp.edit().putInt(KEY_RESIZE_MODE, value).apply()
 
     /**
+     * Автоматически переключаться на следующую серию, когда текущая заканчивается
+     * (только если у торрента больше одного видеофайла). Включено по умолчанию.
+     */
+    var autoNextEpisode: Boolean
+        get() = sp.getBoolean(KEY_AUTO_NEXT, true)
+        set(value) = sp.edit().putBoolean(KEY_AUTO_NEXT, value).apply()
+
+    /**
      * true — всегда декодировать сложный звук (AC-3/DTS/TrueHD и т.п.) в PCM самим плеером,
      * не полагаясь на "проброс" (passthrough) через HDMI. Лучше подходит для ТВ без eARC,
      * где обычный ARC не пропускает TrueHD/DTS-HD/lossless Atmos целиком.
@@ -75,5 +83,6 @@ class AppPrefs(context: Context) {
         private const val KEY_SPEED = "playback_speed"
         private const val KEY_RESIZE_MODE = "resize_mode"
         private const val KEY_AUDIO_FORCE_PCM = "audio_force_pcm"
+        private const val KEY_AUTO_NEXT = "auto_next_episode"
     }
 }
