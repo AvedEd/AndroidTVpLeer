@@ -19,9 +19,9 @@
         android:layout_height="wrap_content"
         android:layout_gravity="top|start"
         android:layout_margin="24dp"
-        android:background="#AA000000"
+        android:background="@drawable/panel_background"
         android:padding="10dp"
-        android:textColor="#FFFFFF"
+        android:textColor="@color/text_primary"
         android:textSize="16sp"
         android:visibility="gone" />
 
@@ -31,7 +31,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="top|end"
         android:layout_margin="24dp"
-        android:background="#AA000000"
+        android:background="@drawable/panel_background"
         android:orientation="vertical"
         android:padding="14dp"
         android:visibility="gone">
@@ -40,7 +40,7 @@
             android:id="@+id/text_buffer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/text_primary"
             android:textSize="14sp" />
 
         <TextView
@@ -48,7 +48,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:textColor="#CCCCCC"
+            android:textColor="@color/text_muted"
             android:textSize="12sp" />
     </LinearLayout>
 
@@ -58,7 +58,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:layout_marginBottom="90dp"
-        android:background="#AA000000"
+        android:background="@drawable/panel_background"
         android:orientation="vertical"
         android:padding="14dp"
         android:visibility="gone">
@@ -67,7 +67,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Аудио"
-            android:textColor="#AAAAAA"
+            android:textColor="@color/text_secondary"
             android:textSize="12sp" />
 
         <LinearLayout
@@ -82,7 +82,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:text="Субтитры"
-            android:textColor="#AAAAAA"
+            android:textColor="@color/text_secondary"
             android:textSize="12sp" />
 
         <LinearLayout
@@ -126,7 +126,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:background="#CC000000"
+        android:background="@drawable/error_background"
         android:orientation="vertical"
         android:gravity="center"
         android:padding="20dp"
@@ -136,7 +136,7 @@
             android:id="@+id/text_error"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/text_primary"
             android:textSize="15sp"
             android:gravity="center" />
 
