@@ -34,6 +34,7 @@ class SettingsActivity : AppCompatActivity() {
         binding.editHost.setText(prefs.serverHost)
         binding.checkBuffer.isChecked = prefs.showBufferOverlay
         binding.checkResume.isChecked = prefs.resumePlayback
+        binding.checkAutoNext.isChecked = prefs.autoNextEpisode
         binding.checkAudioPcm.isChecked = prefs.audioForcePcm
 
         val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, seekOptions.map { "$it сек" })
@@ -135,6 +136,7 @@ class SettingsActivity : AppCompatActivity() {
         prefs.seekStepSeconds = seekOptions[binding.spinnerSeek.selectedItemPosition]
         prefs.showBufferOverlay = binding.checkBuffer.isChecked
         prefs.resumePlayback = binding.checkResume.isChecked
+        prefs.autoNextEpisode = binding.checkAutoNext.isChecked
         prefs.audioForcePcm = binding.checkAudioPcm.isChecked
         finish()
     }
