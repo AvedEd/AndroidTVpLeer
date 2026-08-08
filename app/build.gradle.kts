@@ -18,10 +18,28 @@ android {
         versionName = "1.0"
     }
 
+    signingConfigs {
+        create("release") {
+            // Значения передаются через -P флаги из GitHub Actions (см. workflow).
+            // Локально при отсутствии этих проперти release-сборка просто не будет подписана
+            // релизным ключом (соберётся, но не подпишется) — это ожидаемо для локальной разработки.
+            val ksFile = project.findProperty("RELEASE_STORE_FILE") as String?
+            if (ksFile != null) {
+                storeFile = file(ksFile)
+                storePassword = project.findProperty("RELEASE_STORE_PASSWORD") as String?
+                keyAlias = project.findProperty("RELEASE_KEY_ALIAS") as String?
+                keyPassword = project.findProperty("RELEASE_KEY_PASSWORD") as String?
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (project.hasProperty("RELEASE_STORE_FILE")) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
