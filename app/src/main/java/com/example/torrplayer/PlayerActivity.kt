@@ -206,7 +206,51 @@ class PlayerActivity : AppCompatActivity() {
 
         loadEpisodesInBackground()
 
-        initPlayer()
+        val charset = prefs.subtitleCharset
+        if (charset != null && externalSubtitles.isNotEmpty()) {
+            lifecycleScope.launch {
+                externalSubtitles = withContext(Dispatchers.IO) {
+                    reencodeSubtitlesToUtf8(externalSubtitles, charset)
+                }
+                initPlayer()
+            }
+        } else {
+            initPlayer()
+        }
+    }
+
+    /**
+     * Перекодирует внешние .srt субтитры из выбранной кодировки (например Windows-1251)
+     * в UTF-8, сохраняя результат во временный файл в кеше приложения. Media3 сам по себе
+     * не умеет выбирать кодировку для SRT — только угадывает UTF-8/BOM, поэтому старые
+     * русские субтитры из раздач иначе показываются кракозябрами.
+     */
+    private fun reencodeSubtitlesToUtf8(
+        subs: List<Pair<Uri, String?>>,
+        charsetName: String
+    ): List<Pair<Uri, String?>> {
+        val charset = try {
+            java.nio.charset.Charset.forName(charsetName)
+        } catch (e: Exception) {
+            return subs
+        }
+        val subsDir = java.io.File(cacheDir, "subs").apply { mkdirs() }
+
+        return subs.mapIndexed { index, (uri, name) ->
+            try {
+                val rawBytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: return@mapIndexed uri to name
+                val text = String(rawBytes, charset)
+                val outFile = java.io.File(subsDir, "sub_$index.srt")
+                outFile.writeText(text, Charsets.UTF_8)
+                val outUri = androidx.core.content.FileProvider.getUriForFile(
+                    this, "$packageName.fileprovider", outFile
+                )
+                outUri to name
+            } catch (e: Exception) {
+                uri to name
+            }
+        }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -447,10 +491,10 @@ class PlayerActivity : AppCompatActivity() {
     private fun initPlayer() {
         val seekMs = prefs.seekStepSeconds * 1000L
 
-        val rendererMode = if (prefs.audioForcePcm) {
-            DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
-        } else {
-            DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+        val rendererMode = when (prefs.audioDecodeMode) {
+            0 -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
+            2 -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+            else -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
         }
         val renderersFactory = DefaultRenderersFactory(this)
             .setExtensionRendererMode(rendererMode)
@@ -644,10 +688,6 @@ class PlayerActivity : AppCompatActivity() {
     private fun isVideoFile(path: String): Boolean =
         path.substringAfterLast('.', "").lowercase() in VIDEO_EXTENSIONS
 
-    /**
-     * Сравнивает строки "по-человечески": "Серия 2" < "Серия 10", а не наоборот,
-     * как было бы при обычной текстовой сортировке (где "10" < "2").
-     */
     private fun naturalCompare(a: String, b: String): Int {
         val chunkRegex = Regex("\\d+|\\D+")
         val partsA = chunkRegex.findAll(a).map { it.value }.toList()
@@ -668,10 +708,6 @@ class PlayerActivity : AppCompatActivity() {
         return partsA.size.compareTo(partsB.size)
     }
 
-    /**
-     * Следующий по порядку видеофайл в этом торренте относительно того, что играет сейчас.
-     * null — если серий меньше двух, текущий файл не нашёлся в списке, или это последняя серия.
-     */
     private fun nextEpisode(): TorrentFileStat? {
         if (episodeFiles.size < 2) return null
         val currentFileName = TorrServerUrlUtils.fileNameOf(streamUrl)
