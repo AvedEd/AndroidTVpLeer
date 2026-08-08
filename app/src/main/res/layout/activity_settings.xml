@@ -68,19 +68,43 @@
         android:text="@string/auto_next_episode"
         android:textColor="@color/text_primary" />
 
-    <CheckBox
-        android:id="@+id/check_audio_pcm"
+    <TextView
         android:layout_width="640dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="24dp"
-        android:text="@string/audio_force_pcm"
+        android:text="@string/audio_decode_mode"
         android:textColor="@color/text_primary" />
+
+    <Spinner
+        android:id="@+id/spinner_audio_mode"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
 
     <TextView
         android:layout_width="640dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:text="@string/audio_force_pcm_hint"
+        android:text="@string/audio_decode_mode_hint"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp" />
+
+    <TextView
+        android:layout_width="640dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="@string/subtitle_charset"
+        android:textColor="@color/text_primary" />
+
+    <Spinner
+        android:id="@+id/spinner_subtitle_charset"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+
+    <TextView
+        android:layout_width="640dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/subtitle_charset_hint"
         android:textColor="@color/text_secondary"
         android:textSize="13sp" />
 
