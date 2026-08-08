@@ -26,20 +26,37 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build debug APK
-        run: gradle assembleDebug -PversionCode=${{ github.run_number }} --stacktrace
+      - name: Decode release keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.keystore
+
+      - name: Build release APK
+        run: |
+          gradle assembleRelease \
+            -PversionCode=${{ github.run_number }} \
+            -PRELEASE_STORE_FILE=${{ github.workspace }}/release.keystore \
+            -PRELEASE_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }} \
+            -PRELEASE_KEY_ALIAS=${{ secrets.KEY_ALIAS }} \
+            -PRELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }} \
+            --stacktrace
+
+      - name: Remove keystore from runner
+        if: always()
+        run: rm -f release.keystore
+
+      - name: Print signing certificate fingerprint (для сверки между сборками)
+        run: keytool -printcert -jarfile app/build/outputs/apk/release/app-release.apk
 
       - name: Upload build artifact (backup download route)
         uses: actions/upload-artifact@v4
         with:
-          name: TorrPlayer-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: TorrPlayer-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
 
       - name: Publish GitHub Release with direct APK link
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: TorrPlayer build ${{ github.run_number }}
-          files: app/build/outputs/apk/debug/app-debug.apk
+          files: app/build/outputs/apk/release/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
