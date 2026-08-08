@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="audio_decode_mode_options">
+        <item>Авто (проброс, если поддерживается)</item>
+        <item>Всегда PCM (рекомендуется)</item>
+        <item>PCM только при сбое</item>
+    </string-array>
+
+    <string-array name="subtitle_charset_options">
+        <item>Авто</item>
+        <item>UTF-8</item>
+        <item>Windows-1251</item>
+        <item>KOI8-R</item>
+        <item>CP866</item>
+    </string-array>
+</resources>
