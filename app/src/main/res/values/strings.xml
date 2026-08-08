@@ -14,6 +14,7 @@
     <string name="seek_step">Шаг перемотки (сек)</string>
     <string name="show_buffer">Показывать индикатор буфера</string>
     <string name="resume_playback">Продолжать с места остановки</string>
+    <string name="auto_next_episode">Автоматически включать следующую серию</string>
     <string name="audio_force_pcm">Всегда декодировать сложный звук (AC-3/DTS/TrueHD) в PCM</string>
     <string name="audio_force_pcm_hint">Включено — надёжнее для ТВ без eARC (обычный ARC не пропускает
         TrueHD/DTS-HD целиком). Выключите, если у вас ТВ/ресивер с eARC и хотите честный
