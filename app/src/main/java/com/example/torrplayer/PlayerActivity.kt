@@ -510,7 +510,13 @@ class PlayerActivity : AppCompatActivity() {
 
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_ENDED) {
-                    reportResultAndFinish()
+                    val next = if (prefs.autoNextEpisode) nextEpisode() else null
+                    if (next != null) {
+                        Toast.makeText(this@PlayerActivity, "Следующая серия…", Toast.LENGTH_SHORT).show()
+                        switchToEpisode(next)
+                    } else {
+                        reportResultAndFinish()
+                    }
                 }
             }
         })
@@ -627,7 +633,7 @@ class PlayerActivity : AppCompatActivity() {
             val info = withContext(Dispatchers.IO) { try { client.getTorrent(h) } catch (e: Exception) { null } }
             val files = info?.fileStats.orEmpty()
                 .filter { isVideoFile(it.path) }
-                .sortedBy { it.path }
+                .sortedWith(Comparator { a, b -> naturalCompare(a.path, b.path) })
             if (files.size > 1) {
                 episodeFiles = files
                 binding.btnEpisodes.visibility = View.VISIBLE
@@ -637,6 +643,42 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun isVideoFile(path: String): Boolean =
         path.substringAfterLast('.', "").lowercase() in VIDEO_EXTENSIONS
+
+    /**
+     * Сравнивает строки "по-человечески": "Серия 2" < "Серия 10", а не наоборот,
+     * как было бы при обычной текстовой сортировке (где "10" < "2").
+     */
+    private fun naturalCompare(a: String, b: String): Int {
+        val chunkRegex = Regex("\\d+|\\D+")
+        val partsA = chunkRegex.findAll(a).map { it.value }.toList()
+        val partsB = chunkRegex.findAll(b).map { it.value }.toList()
+        val len = minOf(partsA.size, partsB.size)
+        for (i in 0 until len) {
+            val pa = partsA[i]
+            val pb = partsB[i]
+            val cmp = if (pa.firstOrNull()?.isDigit() == true && pb.firstOrNull()?.isDigit() == true) {
+                val na = pa.toLongOrNull()
+                val nb = pb.toLongOrNull()
+                if (na != null && nb != null) na.compareTo(nb) else pa.compareTo(pb)
+            } else {
+                pa.compareTo(pb)
+            }
+            if (cmp != 0) return cmp
+        }
+        return partsA.size.compareTo(partsB.size)
+    }
+
+    /**
+     * Следующий по порядку видеофайл в этом торренте относительно того, что играет сейчас.
+     * null — если серий меньше двух, текущий файл не нашёлся в списке, или это последняя серия.
+     */
+    private fun nextEpisode(): TorrentFileStat? {
+        if (episodeFiles.size < 2) return null
+        val currentFileName = TorrServerUrlUtils.fileNameOf(streamUrl)
+        val currentIndex = episodeFiles.indexOfFirst { it.path.substringAfterLast('/') == currentFileName }
+        if (currentIndex == -1 || currentIndex + 1 >= episodeFiles.size) return null
+        return episodeFiles[currentIndex + 1]
+    }
 
     private fun showEpisodesDialog() {
         if (episodeFiles.isEmpty()) return
