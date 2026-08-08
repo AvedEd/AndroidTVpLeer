@@ -5,4 +5,8 @@
     <color name="accent">#3DDC84</color>
     <color name="text_primary">#FFFFFF</color>
     <color name="text_secondary">#AAAAAA</color>
+    <color name="text_muted">#CCCCCC</color>
+    <color name="border">#33FFFFFF</color>
+    <color name="overlay_panel">#AA000000</color>
+    <color name="overlay_dark">#CC000000</color>
 </resources>
