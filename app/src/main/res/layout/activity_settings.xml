@@ -62,6 +62,13 @@
         android:textColor="@color/text_primary" />
 
     <CheckBox
+        android:id="@+id/check_auto_next"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/auto_next_episode"
+        android:textColor="@color/text_primary" />
+
+    <CheckBox
         android:id="@+id/check_audio_pcm"
         android:layout_width="640dp"
         android:layout_height="wrap_content"
