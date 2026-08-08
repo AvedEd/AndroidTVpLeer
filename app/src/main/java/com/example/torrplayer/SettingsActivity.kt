@@ -23,6 +23,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var prefs: AppPrefs
 
     private val seekOptions = listOf(1, 2, 3, 5, 10, 15, 30, 60)
+    private val charsetOptions = listOf(null, "UTF-8", "windows-1251", "koi8-r", "cp866")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,7 +36,20 @@ class SettingsActivity : AppCompatActivity() {
         binding.checkBuffer.isChecked = prefs.showBufferOverlay
         binding.checkResume.isChecked = prefs.resumePlayback
         binding.checkAutoNext.isChecked = prefs.autoNextEpisode
-        binding.checkAudioPcm.isChecked = prefs.audioForcePcm
+
+        val audioAdapter = ArrayAdapter.createFromResource(
+            this, R.array.audio_decode_mode_options, android.R.layout.simple_spinner_item
+        )
+        audioAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        binding.spinnerAudioMode.adapter = audioAdapter
+        binding.spinnerAudioMode.setSelection(prefs.audioDecodeMode.coerceIn(0, 2))
+
+        val charsetAdapter = ArrayAdapter.createFromResource(
+            this, R.array.subtitle_charset_options, android.R.layout.simple_spinner_item
+        )
+        charsetAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        binding.spinnerSubtitleCharset.adapter = charsetAdapter
+        binding.spinnerSubtitleCharset.setSelection(charsetOptions.indexOf(prefs.subtitleCharset).coerceAtLeast(0))
 
         val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, seekOptions.map { "$it сек" })
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
@@ -137,7 +151,8 @@ class SettingsActivity : AppCompatActivity() {
         prefs.showBufferOverlay = binding.checkBuffer.isChecked
         prefs.resumePlayback = binding.checkResume.isChecked
         prefs.autoNextEpisode = binding.checkAutoNext.isChecked
-        prefs.audioForcePcm = binding.checkAudioPcm.isChecked
+        prefs.audioDecodeMode = binding.spinnerAudioMode.selectedItemPosition
+        prefs.subtitleCharset = charsetOptions[binding.spinnerSubtitleCharset.selectedItemPosition]
         finish()
     }
 }
