@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Разрешения для работы с сетью -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    
+    <!-- Разрешение для установки обновлений/пакетов -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Поддержка Android TV / Leanback -->
     <uses-feature
         android:name="android.software.leanback"
         android:required="false" />
@@ -12,6 +16,7 @@
         android:name="android.hardware.touchscreen"
         android:required="false" />
 
+    <!-- Запросы пакетов для Android 11+ (Package Visibility) -->
     <queries>
         <intent>
             <action android:name="android.intent.action.VIEW" />
@@ -27,6 +32,7 @@
         android:theme="@style/Theme.TorrPlayer"
         android:usesCleartextTraffic="true">
 
+        <!-- Главная Activity (Главный экран / TV Launcher) -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -38,44 +44,50 @@
             </intent-filter>
         </activity>
 
+        <!-- Настройки -->
         <activity
             android:name=".SettingsActivity"
             android:exported="false"
-            android:theme="@style/Theme.TorrPlayer"
-            android:screenOrientation="landscape" />
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.TorrPlayer" />
 
+        <!-- Плеер -->
         <activity
             android:name=".PlayerActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
             android:exported="true"
-            android:screenOrientation="landscape"
-            android:theme="@style/Theme.TorrPlayer.Player"
             android:launchMode="singleTask"
-            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout">
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.TorrPlayer.Player">
+
+            <!-- 1. Обработка видео по MIME-типу (для content://, http://, file://) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
+
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+
                 <data android:scheme="http" />
                 <data android:scheme="https" />
-                <data android:mimeType="video/*" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="content" />
                 <data android:scheme="file" />
                 <data android:mimeType="video/*" />
+                <data android:mimeType="application/x-mpegURL" />
+                <data android:mimeType="application/dash+xml" />
             </intent-filter>
 
+            <!-- 2. Обработка видео по расширениям файлов (file:// и http/https без указания mimeType) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
+
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+
                 <data android:scheme="http" />
                 <data android:scheme="https" />
-                <data android:scheme="content" />
                 <data android:scheme="file" />
-                <data android:host="*" />
+
+                <!-- Исправленный синтаксис PATTERN_SIMPLE_GLOB -->
                 <data android:pathPattern=".*\\.mp4" />
                 <data android:pathPattern=".*\\.MP4" />
                 <data android:pathPattern=".*\\.m4v" />
@@ -96,8 +108,6 @@
                 <data android:pathPattern=".*\\.MTS" />
                 <data android:pathPattern=".*\\.3gp" />
                 <data android:pathPattern=".*\\.3GP" />
-                <data android:pathPattern=".*\\.3gpp" />
-                <data android:pathPattern=".*\\.3GPP" />
                 <data android:pathPattern=".*\\.flv" />
                 <data android:pathPattern=".*\\.FLV" />
                 <data android:pathPattern=".*\\.wmv" />
@@ -108,12 +118,6 @@
                 <data android:pathPattern=".*\\.MPEG" />
                 <data android:pathPattern=".*\\.ogv" />
                 <data android:pathPattern=".*\\.OGV" />
-                <data android:pathPattern=".*\\.ogg" />
-                <data android:pathPattern=".*\\.OGG" />
-                <data android:pathPattern=".*\\.divx" />
-                <data android:pathPattern=".*\\.DIVX" />
-                <data android:pathPattern=".*\\.dts" />
-                <data android:pathPattern=".*\\.DTS" />
                 <data android:pathPattern=".*\\.vob" />
                 <data android:pathPattern=".*\\.VOB" />
                 <data android:pathPattern=".*\\.m3u8" />
@@ -121,8 +125,10 @@
                 <data android:pathPattern=".*\\.mpd" />
                 <data android:pathPattern=".*\\.MPD" />
             </intent-filter>
+
         </activity>
 
+        <!-- Провайдер файлов -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
