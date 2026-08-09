@@ -69,6 +69,16 @@ class AppPrefs(context: Context) {
         get() = sp.getString(KEY_SUBTITLE_CHARSET, null)
         set(value) = sp.edit().putString(KEY_SUBTITLE_CHARSET, value).apply()
 
+    /**
+     * Экспериментально: аппаратная синхронизация видео/звука (tunneling) через ExoPlayer.
+     * Может сгладить рывки на тяжёлом 4K, но поддерживается не на всех приставках —
+     * если устройство не умеет, ExoPlayer сам тихо откатится на обычный режим.
+     * Выключено по умолчанию.
+     */
+    var tunnelingEnabled: Boolean
+        get() = sp.getBoolean(KEY_TUNNELING, false)
+        set(value) = sp.edit().putBoolean(KEY_TUNNELING, value).apply()
+
     fun savePosition(streamUrl: String, positionMs: Long) {
         sp.edit().putLong(posKey(streamUrl), positionMs).apply()
     }
@@ -91,5 +101,6 @@ class AppPrefs(context: Context) {
         private const val KEY_AUDIO_DECODE_MODE = "audio_decode_mode"
         private const val KEY_SUBTITLE_CHARSET = "subtitle_charset"
         private const val KEY_AUTO_NEXT = "auto_next_episode"
+        private const val KEY_TUNNELING = "tunneling_enabled"
     }
 }
