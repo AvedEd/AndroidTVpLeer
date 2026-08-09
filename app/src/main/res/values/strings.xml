@@ -21,6 +21,9 @@
     <string name="subtitle_charset">Кодировка внешних субтитров (.srt)</string>
     <string name="subtitle_charset_hint">Если вместо русского текста в субтитрах видите кракозябры — переключите
         кодировку здесь. Большинство старых .srt в раздачах сохранены в Windows-1251.</string>
+    <string name="tunneling_enabled">Аппаратная синхронизация видео (экспериментально)</string>
+    <string name="tunneling_enabled_hint">Может сгладить рывки на тяжёлом 4K на современных приставках.
+        Поддерживается не всеми устройствами — если не поддерживается, ничего не изменится.</string>
     <string name="test_connection">Проверить соединение</string>
     <string name="check_update">Проверить обновления</string>
     <string name="no_update">Обновлений не найдено — установлена последняя версия</string>
