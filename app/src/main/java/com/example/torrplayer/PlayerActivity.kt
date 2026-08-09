@@ -27,6 +27,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.AspectRatioFrameLayout
 import com.example.torrplayer.databinding.ActivityPlayerBinding
 import com.example.torrplayer.prefs.AppPrefs
@@ -611,8 +612,16 @@ class PlayerActivity : AppCompatActivity() {
         } else {
             trackParams.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
         }
-        trackParams.setTunnelingEnabled(prefs.tunnelingEnabled)
         exoPlayer.trackSelectionParameters = trackParams.build()
+
+        // Tunneling — отдельный параметр, живёт только в DefaultTrackSelector.Parameters,
+        // а не в базовом TrackSelectionParameters, поэтому применяется через сам селектор.
+        val trackSelector = exoPlayer.trackSelector
+        if (trackSelector is DefaultTrackSelector) {
+            trackSelector.parameters = trackSelector.buildUponParameters()
+                .setTunnelingEnabled(prefs.tunnelingEnabled)
+                .build()
+        }
     }
 
     private fun startPlayback(exoPlayer: ExoPlayer, url: String) {
