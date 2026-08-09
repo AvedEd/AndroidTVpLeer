@@ -36,6 +36,7 @@ class SettingsActivity : AppCompatActivity() {
         binding.checkBuffer.isChecked = prefs.showBufferOverlay
         binding.checkResume.isChecked = prefs.resumePlayback
         binding.checkAutoNext.isChecked = prefs.autoNextEpisode
+        binding.checkTunneling.isChecked = prefs.tunnelingEnabled
 
         val audioAdapter = ArrayAdapter.createFromResource(
             this, R.array.audio_decode_mode_options, android.R.layout.simple_spinner_item
@@ -151,6 +152,7 @@ class SettingsActivity : AppCompatActivity() {
         prefs.showBufferOverlay = binding.checkBuffer.isChecked
         prefs.resumePlayback = binding.checkResume.isChecked
         prefs.autoNextEpisode = binding.checkAutoNext.isChecked
+        prefs.tunnelingEnabled = binding.checkTunneling.isChecked
         prefs.audioDecodeMode = binding.spinnerAudioMode.selectedItemPosition
         prefs.subtitleCharset = charsetOptions[binding.spinnerSubtitleCharset.selectedItemPosition]
         finish()
