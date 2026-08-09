@@ -1,141 +1,149 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background"
-    android:orientation="vertical"
-    android:padding="48dp">
+    android:fillViewport="true"
+    android:scrollbars="vertical">
 
-    <TextView
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/settings"
-        android:textColor="@color/text_primary"
-        android:textSize="28sp"
-        android:layout_marginBottom="24dp" />
+        android:orientation="vertical"
+        android:padding="48dp">
 
-    <TextView
-        android:layout_width="640dp"
-        android:layout_height="wrap_content"
-        android:text="@string/server_host"
-        android:textColor="@color/text_secondary" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings"
+            android:textColor="@color/text_primary"
+            android:textSize="28sp"
+            android:layout_marginBottom="24dp" />
 
-    <EditText
-        android:id="@+id/edit_host"
-        android:layout_width="640dp"
-        android:layout_height="wrap_content"
-        android:inputType="textUri"
-        android:textColor="@color/text_primary" />
+        <TextView
+            android:layout_width="640dp"
+            android:layout_height="wrap_content"
+            android:text="@string/server_host"
+            android:textColor="@color/text_secondary" />
 
-    <Button
-        android:id="@+id/btn_test"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/test_connection" />
+        <EditText
+            android:id="@+id/edit_host"
+            android:layout_width="640dp"
+            android:layout_height="wrap_content"
+            android:inputType="textUri"
+            android:textColor="@color/text_primary" />
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="@string/seek_step"
-        android:textColor="@color/text_secondary" />
+        <Button
+            android:id="@+id/btn_test"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/test_connection" />
 
-    <Spinner
-        android:id="@+id/spinner_seek"
-        android:layout_width="240dp"
-        android:layout_height="wrap_content" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/seek_step"
+            android:textColor="@color/text_secondary" />
 
-    <CheckBox
-        android:id="@+id/check_buffer"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="@string/show_buffer"
-        android:textColor="@color/text_primary" />
+        <Spinner
+            android:id="@+id/spinner_seek"
+            android:layout_width="240dp"
+            android:layout_height="wrap_content" />
 
-    <CheckBox
-        android:id="@+id/check_resume"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/resume_playback"
-        android:textColor="@color/text_primary" />
+        <CheckBox
+            android:id="@+id/check_buffer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/show_buffer"
+            android:textColor="@color/text_primary" />
 
-    <CheckBox
-        android:id="@+id/check_auto_next"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/auto_next_episode"
-        android:textColor="@color/text_primary" />
+        <CheckBox
+            android:id="@+id/check_resume"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/resume_playback"
+            android:textColor="@color/text_primary" />
 
-    <TextView
-        android:layout_width="640dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="@string/audio_decode_mode"
-        android:textColor="@color/text_primary" />
+        <CheckBox
+            android:id="@+id/check_auto_next"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/auto_next_episode"
+            android:textColor="@color/text_primary" />
 
-    <Spinner
-        android:id="@+id/spinner_audio_mode"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
+        <TextView
+            android:layout_width="640dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/audio_decode_mode"
+            android:textColor="@color/text_primary" />
 
-    <TextView
-        android:layout_width="640dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="@string/audio_decode_mode_hint"
-        android:textColor="@color/text_secondary"
-        android:textSize="13sp" />
+        <Spinner
+            android:id="@+id/spinner_audio_mode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
 
-    <TextView
-        android:layout_width="640dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="@string/subtitle_charset"
-        android:textColor="@color/text_primary" />
+        <TextView
+            android:layout_width="640dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/audio_decode_mode_hint"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
 
-    <Spinner
-        android:id="@+id/spinner_subtitle_charset"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
+        <TextView
+            android:layout_width="640dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/subtitle_charset"
+            android:textColor="@color/text_primary" />
 
-    <TextView
-        android:layout_width="640dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="@string/subtitle_charset_hint"
-        android:textColor="@color/text_secondary"
-        android:textSize="13sp" />
+        <Spinner
+            android:id="@+id/spinner_subtitle_charset"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
 
-    <CheckBox
-        android:id="@+id/check_tunneling"
-        android:layout_width="640dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="@string/tunneling_enabled"
-        android:textColor="@color/text_primary" />
+        <TextView
+            android:layout_width="640dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/subtitle_charset_hint"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
 
-    <TextView
-        android:layout_width="640dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="@string/tunneling_enabled_hint"
-        android:textColor="@color/text_secondary"
-        android:textSize="13sp" />
+        <CheckBox
+            android:id="@+id/check_tunneling"
+            android:layout_width="640dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/tunneling_enabled"
+            android:textColor="@color/text_primary" />
 
-    <Button
-        android:id="@+id/btn_check_update"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="@string/check_update" />
+        <TextView
+            android:layout_width="640dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/tunneling_enabled_hint"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
 
-    <Button
-        android:id="@+id/btn_save"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="@android:string/ok" />
+        <Button
+            android:id="@+id/btn_check_update"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/check_update" />
 
-</LinearLayout>
+        <Button
+            android:id="@+id/btn_save"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="24dp"
+            android:text="@android:string/ok" />
+
+    </LinearLayout>
+</ScrollView>
