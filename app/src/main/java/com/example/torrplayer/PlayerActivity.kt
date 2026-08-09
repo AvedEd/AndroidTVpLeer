@@ -48,7 +48,7 @@ class PlayerActivity : AppCompatActivity() {
         const val EXTRA_HASH = "extra_hash"
 
         private val SPEEDS = floatArrayOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
-        private const val PANEL_AUTO_HIDE_MS = 6000L
+        private const val PANEL_AUTO_HIDE_MS = 12000L
         private const val BACK_EXIT_WINDOW_MS = 2000L
 
         private val RESIZE_MODES = intArrayOf(
@@ -262,6 +262,15 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // Пока открыта любая панель — любое нажатие пультом (навигация внутри неё)
+        // сбрасывает таймер автозакрытия, чтобы панель не пропадала во время выбора.
+        if (currentPanel != Panel.NONE &&
+            event.action == KeyEvent.ACTION_DOWN &&
+            event.keyCode != KeyEvent.KEYCODE_BACK
+        ) {
+            resetPanelHideTimer()
+        }
+
         when (event.keyCode) {
             KeyEvent.KEYCODE_DPAD_DOWN -> {
                 if (event.action == KeyEvent.ACTION_DOWN && currentPanel != Panel.CONTROLS) {
@@ -276,7 +285,7 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                if (currentPanel == Panel.NONE || (currentPanel == Panel.CONTROLS && isTimeBarFocused())) {
+                if (currentPanel == Panel.CONTROLS && isTimeBarFocused()) {
                     val direction = if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) 1 else -1
                     when (event.action) {
                         KeyEvent.ACTION_DOWN -> {
@@ -292,6 +301,12 @@ class PlayerActivity : AppCompatActivity() {
                             seekHoldDirection = 0
                             uiHandler.removeCallbacks(seekHoldRunnable)
                         }
+                    }
+                    return true
+                }
+                if (currentPanel == Panel.NONE && event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    if (event.action == KeyEvent.ACTION_DOWN && episodeFiles.size > 1) {
+                        showEpisodesDialog()
                     }
                     return true
                 }
@@ -433,6 +448,20 @@ class PlayerActivity : AppCompatActivity() {
         binding.panelInfo.visibility = View.GONE
         currentPanel = Panel.NONE
         uiHandler.removeCallbacks(hidePanelRunnable)
+    }
+
+    /**
+     * Сбрасывает таймер автозакрытия панели — вызывается на любое нажатие пультом,
+     * пока панель открыта, чтобы она не закрывалась, пока пользователь ей пользуется.
+     */
+    private fun resetPanelHideTimer() {
+        uiHandler.removeCallbacks(hidePanelRunnable)
+        if (currentPanel != Panel.NONE) {
+            uiHandler.postDelayed(hidePanelRunnable, PANEL_AUTO_HIDE_MS)
+            if (currentPanel == Panel.CONTROLS) {
+                binding.playerView.showController()
+            }
+        }
     }
 
     private fun dpToPx(dp: Int): Int = (dp * resources.displayMetrics.density).toInt()
