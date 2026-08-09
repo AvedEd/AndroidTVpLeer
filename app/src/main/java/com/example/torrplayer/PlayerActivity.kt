@@ -578,6 +578,7 @@ class PlayerActivity : AppCompatActivity() {
         } else {
             trackParams.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
         }
+        trackParams.setTunnelingEnabled(prefs.tunnelingEnabled)
         exoPlayer.trackSelectionParameters = trackParams.build()
     }
 
