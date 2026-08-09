@@ -60,6 +60,7 @@ class PlayerActivity : AppCompatActivity() {
         private const val SEEK_TICK_MS = 300L
         private const val SEEK_ACCEL_STAGE1_MS = 1500L
         private const val SEEK_ACCEL_STAGE2_MS = 4000L
+        private const val OK_LONG_PRESS_MS = 500L
 
         private const val MIN_BUFFER_MS = 30_000
         private const val MAX_BUFFER_MS = 90_000
@@ -103,6 +104,12 @@ class PlayerActivity : AppCompatActivity() {
 
     private var seekHoldDirection = 0
     private var seekHoldStartedAt = 0L
+
+    private var centerLongPressTriggered = false
+    private val centerLongPressRunnable = Runnable {
+        centerLongPressTriggered = true
+        togglePanel(Panel.CONTROLS)
+    }
 
     private val seekHoldRunnable = object : Runnable {
         override fun run() {
@@ -288,6 +295,27 @@ class PlayerActivity : AppCompatActivity() {
                     return true
                 }
             }
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                if (currentPanel == Panel.NONE) {
+                    when (event.action) {
+                        KeyEvent.ACTION_DOWN -> {
+                            if (event.repeatCount == 0) {
+                                centerLongPressTriggered = false
+                                uiHandler.removeCallbacks(centerLongPressRunnable)
+                                uiHandler.postDelayed(centerLongPressRunnable, OK_LONG_PRESS_MS)
+                            }
+                        }
+                        KeyEvent.ACTION_UP -> {
+                            uiHandler.removeCallbacks(centerLongPressRunnable)
+                            if (!centerLongPressTriggered) {
+                                togglePlayPause()
+                            }
+                            centerLongPressTriggered = false
+                        }
+                    }
+                    return true
+                }
+            }
         }
         return super.dispatchKeyEvent(event)
     }
@@ -371,6 +399,11 @@ class PlayerActivity : AppCompatActivity() {
         val durationMs = if (p.duration > 0) p.duration else Long.MAX_VALUE
         val target = (p.currentPosition + deltaSeconds * 1000L).coerceIn(0, durationMs)
         p.seekTo(target)
+    }
+
+    private fun togglePlayPause() {
+        val p = player ?: return
+        p.playWhenReady = !p.playWhenReady
     }
 
     private fun togglePanel(panel: Panel) {
