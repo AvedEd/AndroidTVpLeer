@@ -13,6 +13,7 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.C
@@ -92,6 +93,9 @@ class PlayerActivity : AppCompatActivity() {
     private var lastAppliedFrameRate = 0f
     private var lastBackPressAt = 0L
     private var episodeFiles: List<TorrentFileStat> = emptyList()
+    private var episodesLoading = false
+    private var episodesLoaded = false
+    private var episodesDialogPending = false
 
     private var incomingTitle: String? = null
     private var externalStartPositionMs: Long? = null
@@ -208,6 +212,26 @@ class PlayerActivity : AppCompatActivity() {
         binding.btnEpisodes.setOnClickListener { showEpisodesDialog() }
         binding.btnRetry.setOnClickListener { retryPlayback() }
 
+        // Скрываем встроенную шестерёнку настроек ExoPlayer — она дублирует
+        // наши собственные панели аудио/субтитров/скорости.
+        binding.playerView.findViewById<View>(androidx.media3.ui.R.id.exo_settings)?.visibility = View.GONE
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (currentPanel != Panel.NONE) {
+                    hideAllPanels()
+                    return
+                }
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastBackPressAt <= BACK_EXIT_WINDOW_MS) {
+                    reportResultAndFinish()
+                } else {
+                    lastBackPressAt = now
+                    Toast.makeText(this@PlayerActivity, "Нажмите «Назад» ещё раз для выхода", Toast.LENGTH_SHORT).show()
+                }
+            }
+        })
+
         aspectIndex = RESIZE_MODES.indexOf(prefs.resizeMode).coerceAtLeast(0)
         binding.playerView.resizeMode = RESIZE_MODES[aspectIndex]
         binding.btnAspect.text = RESIZE_LABELS[aspectIndex]
@@ -305,8 +329,8 @@ class PlayerActivity : AppCompatActivity() {
                     return true
                 }
                 if (currentPanel == Panel.NONE && event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                    if (event.action == KeyEvent.ACTION_DOWN && episodeFiles.size > 1) {
-                        showEpisodesDialog()
+                    if (event.action == KeyEvent.ACTION_DOWN) {
+                        handleEpisodesShortcut()
                     }
                     return true
                 }
@@ -339,20 +363,6 @@ class PlayerActivity : AppCompatActivity() {
     private fun isTimeBarFocused(): Boolean {
         val timeBar = binding.playerView.findViewById<View>(androidx.media3.ui.R.id.exo_progress)
         return timeBar?.hasFocus() == true
-    }
-
-    override fun onBackPressed() {
-        if (currentPanel != Panel.NONE) {
-            hideAllPanels()
-            return
-        }
-        val now = SystemClock.elapsedRealtime()
-        if (now - lastBackPressAt <= BACK_EXIT_WINDOW_MS) {
-            reportResultAndFinish()
-        } else {
-            lastBackPressAt = now
-            Toast.makeText(this, "Нажмите «Назад» ещё раз для выхода", Toast.LENGTH_SHORT).show()
-        }
     }
 
     private fun parseExternalPlayerExtras() {
@@ -466,6 +476,53 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun dpToPx(dp: Int): Int = (dp * resources.displayMetrics.density).toInt()
 
+    /**
+     * Человекочитаемая подпись дорожки: язык + студия перевода (если она есть в самом
+     * файле — обычно зашита в название дорожки в MKV) + пометка [Forced] для
+     * принудительных субтитров (обычно перевод только иностранных вставок в фильме).
+     * Какая дорожка сейчас выбрана — показывает отдельная точка "●" перед текстом.
+     */
+    private fun trackDisplayLabel(format: androidx.media3.common.Format, fallbackName: String): String {
+        val lang = format.language?.let { languageDisplayName(it) }
+        val studio = format.label?.trim()
+            ?.takeIf { it.isNotEmpty() && !it.equals(format.language, ignoreCase = true) }
+        val base = when {
+            lang != null && studio != null -> "$lang ($studio)"
+            lang != null -> lang
+            studio != null -> studio
+            else -> fallbackName
+        }
+        val isForced = (format.selectionFlags and C.SELECTION_FLAG_FORCED) != 0
+        return if (isForced) "$base • Forced" else base
+    }
+
+    private fun languageDisplayName(code: String): String {
+        val normalized = code.lowercase()
+        val known = mapOf(
+            "ru" to "Русский", "rus" to "Русский",
+            "en" to "Английский", "eng" to "Английский",
+            "uk" to "Украинский", "ukr" to "Украинский",
+            "de" to "Немецкий", "ger" to "Немецкий", "deu" to "Немецкий",
+            "fr" to "Французский", "fre" to "Французский", "fra" to "Французский",
+            "es" to "Испанский", "spa" to "Испанский",
+            "it" to "Итальянский", "ita" to "Итальянский",
+            "ja" to "Японский", "jpn" to "Японский",
+            "ko" to "Корейский", "kor" to "Корейский",
+            "zh" to "Китайский", "chi" to "Китайский", "zho" to "Китайский"
+        )
+        known[normalized]?.let { return it }
+        return try {
+            val display = java.util.Locale(normalized).getDisplayLanguage(java.util.Locale("ru"))
+            if (display.isNotBlank() && !display.equals(normalized, ignoreCase = true)) {
+                display.replaceFirstChar { it.uppercase() }
+            } else {
+                code
+            }
+        } catch (e: Exception) {
+            code
+        }
+    }
+
     private fun populateAudioRow() {
         binding.audioRow.removeAllViews()
         val p = player ?: return
@@ -475,7 +532,7 @@ class PlayerActivity : AppCompatActivity() {
             for (trackIndex in 0 until group.length) {
                 val format = group.getTrackFormat(trackIndex)
                 val selected = group.isTrackSelected(trackIndex)
-                val label = format.label ?: format.language ?: "Дорожка"
+                val label = trackDisplayLabel(format, "Дорожка")
                 val btn = Button(this).apply {
                     text = if (selected) "● $label" else label
                     setOnClickListener {
@@ -519,7 +576,7 @@ class PlayerActivity : AppCompatActivity() {
             for (trackIndex in 0 until group.length) {
                 val format = group.getTrackFormat(trackIndex)
                 val selected = group.isTrackSelected(trackIndex)
-                val label = format.label ?: format.language ?: "Субтитры"
+                val label = trackDisplayLabel(format, "Субтитры")
                 val btn = Button(this).apply {
                     text = if (selected) "● $label" else label
                     setOnClickListener {
@@ -743,17 +800,56 @@ class PlayerActivity : AppCompatActivity() {
     private fun loadEpisodesInBackground() {
         val h = hash
         val client = statsClient
-        if (h == null || client == null) return
+        if (h == null || client == null) {
+            episodesLoaded = true
+            return
+        }
 
+        episodesLoading = true
         lifecycleScope.launch {
             val info = withContext(Dispatchers.IO) { try { client.getTorrent(h) } catch (e: Exception) { null } }
             val files = info?.fileStats.orEmpty()
                 .filter { isVideoFile(it.path) }
                 .sortedWith(Comparator { a, b -> naturalCompare(a.path, b.path) })
+
+            episodesLoading = false
+            episodesLoaded = true
+
             if (files.size > 1) {
                 episodeFiles = files
                 binding.btnEpisodes.visibility = View.VISIBLE
             }
+
+            if (episodesDialogPending) {
+                episodesDialogPending = false
+                if (episodeFiles.size > 1) {
+                    showEpisodesDialog()
+                } else {
+                    Toast.makeText(this@PlayerActivity, "Это не сериал — всего один файл", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    /**
+     * Обработка нажатия "вправо" вне панелей — открыть список серий. Список серий
+     * приходит с TorrServer асинхронно и может быть ещё не готов в первые секунды
+     * просмотра, поэтому нажатие не игнорируется молча: если список ещё грузится,
+     * ставим "хочу увидеть список" в очередь и показываем диалог сами, как только
+     * данные придут.
+     */
+    private fun handleEpisodesShortcut() {
+        if (episodeFiles.size > 1) {
+            showEpisodesDialog()
+            return
+        }
+        if (episodesLoading) {
+            episodesDialogPending = true
+            Toast.makeText(this, "Загружаю список серий…", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (episodesLoaded) {
+            Toast.makeText(this, "Это не сериал — всего один файл", Toast.LENGTH_SHORT).show()
         }
     }
 
