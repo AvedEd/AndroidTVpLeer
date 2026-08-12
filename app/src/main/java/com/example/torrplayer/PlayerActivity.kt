@@ -2,6 +2,7 @@ package com.example.torrplayer
 
 import android.app.AlertDialog
 import android.content.Intent
+import android.media.audiofx.LoudnessEnhancer
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -84,6 +85,7 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var prefs: AppPrefs
     private var statsClient: TorrServerClient? = null
     private var player: ExoPlayer? = null
+    private var loudnessEnhancer: LoudnessEnhancer? = null
 
     private var streamUrl: String = ""
     private var hash: String? = null
@@ -93,9 +95,6 @@ class PlayerActivity : AppCompatActivity() {
     private var lastAppliedFrameRate = 0f
     private var lastBackPressAt = 0L
     private var episodeFiles: List<TorrentFileStat> = emptyList()
-    private var episodesLoading = false
-    private var episodesLoaded = false
-    private var episodesDialogPending = false
 
     private var incomingTitle: String? = null
     private var externalStartPositionMs: Long? = null
@@ -328,12 +327,6 @@ class PlayerActivity : AppCompatActivity() {
                     }
                     return true
                 }
-                if (currentPanel == Panel.NONE && event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                    if (event.action == KeyEvent.ACTION_DOWN) {
-                        handleEpisodesShortcut()
-                    }
-                    return true
-                }
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
                 if (currentPanel == Panel.NONE) {
@@ -458,6 +451,11 @@ class PlayerActivity : AppCompatActivity() {
         binding.panelInfo.visibility = View.GONE
         currentPanel = Panel.NONE
         uiHandler.removeCallbacks(hidePanelRunnable)
+        // Наша панель и встроенный контроллер ExoPlayer (ползунок/пауза) — два разных
+        // UI-элемента с независимыми таймерами. Без явного hideController() контроллер
+        // ExoPlayer оставался бы висеть до истечения своих 12 секунд, даже когда мы уже
+        // закрыли свою панель кнопкой "Назад".
+        binding.playerView.hideController()
     }
 
     /**
@@ -649,6 +647,15 @@ class PlayerActivity : AppCompatActivity() {
         player = exoPlayer
         binding.playerView.player = exoPlayer
 
+        exoPlayer.addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+            override fun onAudioSessionIdChanged(
+                eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                audioSessionId: Int
+            ) {
+                setupLoudnessEnhancer(audioSessionId)
+            }
+        })
+
         applyTrackPreferences(exoPlayer)
 
         speedIndex = closestSpeedIndex(prefs.playbackSpeed)
@@ -687,6 +694,26 @@ class PlayerActivity : AppCompatActivity() {
 
         uiHandler.post(bufferUpdater)
         uiHandler.post(serverStatsUpdater)
+    }
+
+    /**
+     * Усиление громкости поверх уже декодированного звука — работает независимо от
+     * системной громкости ТВ. Пересоздаётся при смене audio session id (например,
+     * при переключении аудиодорожки или при смене серии).
+     */
+    private fun setupLoudnessEnhancer(audioSessionId: Int) {
+        loudnessEnhancer?.release()
+        loudnessEnhancer = null
+        if (audioSessionId == android.media.audiofx.AudioEffect.ERROR_BAD_VALUE) return
+        val gainDb = prefs.audioGainDb
+        try {
+            loudnessEnhancer = LoudnessEnhancer(audioSessionId).apply {
+                setTargetGain(gainDb * 100) // дБ -> миллибелы
+                enabled = gainDb > 0
+            }
+        } catch (e: Exception) {
+            loudnessEnhancer = null
+        }
     }
 
     private fun applyTrackPreferences(exoPlayer: ExoPlayer) {
@@ -800,56 +827,17 @@ class PlayerActivity : AppCompatActivity() {
     private fun loadEpisodesInBackground() {
         val h = hash
         val client = statsClient
-        if (h == null || client == null) {
-            episodesLoaded = true
-            return
-        }
+        if (h == null || client == null) return
 
-        episodesLoading = true
         lifecycleScope.launch {
             val info = withContext(Dispatchers.IO) { try { client.getTorrent(h) } catch (e: Exception) { null } }
             val files = info?.fileStats.orEmpty()
                 .filter { isVideoFile(it.path) }
                 .sortedWith(Comparator { a, b -> naturalCompare(a.path, b.path) })
-
-            episodesLoading = false
-            episodesLoaded = true
-
             if (files.size > 1) {
                 episodeFiles = files
                 binding.btnEpisodes.visibility = View.VISIBLE
             }
-
-            if (episodesDialogPending) {
-                episodesDialogPending = false
-                if (episodeFiles.size > 1) {
-                    showEpisodesDialog()
-                } else {
-                    Toast.makeText(this@PlayerActivity, "Это не сериал — всего один файл", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-
-    /**
-     * Обработка нажатия "вправо" вне панелей — открыть список серий. Список серий
-     * приходит с TorrServer асинхронно и может быть ещё не готов в первые секунды
-     * просмотра, поэтому нажатие не игнорируется молча: если список ещё грузится,
-     * ставим "хочу увидеть список" в очередь и показываем диалог сами, как только
-     * данные придут.
-     */
-    private fun handleEpisodesShortcut() {
-        if (episodeFiles.size > 1) {
-            showEpisodesDialog()
-            return
-        }
-        if (episodesLoading) {
-            episodesDialogPending = true
-            Toast.makeText(this, "Загружаю список серий…", Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (episodesLoaded) {
-            Toast.makeText(this, "Это не сериал — всего один файл", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -938,6 +926,8 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         uiHandler.removeCallbacksAndMessages(null)
+        loudnessEnhancer?.release()
+        loudnessEnhancer = null
         player?.release()
         player = null
         super.onDestroy()
