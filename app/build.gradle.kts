@@ -15,7 +15,7 @@ android {
         // так versionCode всегда растёт, и приложение может сравнить себя с последним
         // релизом на GitHub, чтобы понять, есть ли обновление.
         versionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
-        versionName = "1.0"
+        versionName = "2.0.0"
     }
 
     signingConfigs {
