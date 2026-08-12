@@ -741,7 +741,7 @@ class PlayerActivity : AppCompatActivity() {
         val mediaItem = buildMediaItem(url)
 
         val startPos = externalStartPositionMs
-            ?: if (prefs.resumePlayback) prefs.loadPosition(url) else 0L
+            ?: if (prefs.resumePlayback) prefs.loadPosition(TorrServerUrlUtils.fileNameOf(url)) else 0L
         externalStartPositionMs = null
         externalSubtitles = emptyList()
 
@@ -895,7 +895,7 @@ class PlayerActivity : AppCompatActivity() {
         val encodedName = URLEncoder.encode(fileName, "UTF-8")
         val newUrl = "$scheme://$host/stream/$encodedName?link=$h&index=${file.id}&play"
 
-        player?.let { prefs.savePosition(streamUrl, it.currentPosition) }
+        player?.let { prefs.savePosition(fileName, it.currentPosition) }
 
         streamUrl = newUrl
         hideAllPanels()
@@ -921,7 +921,7 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
-        player?.let { prefs.savePosition(streamUrl, it.currentPosition) }
+        player?.let { prefs.savePosition(TorrServerUrlUtils.fileNameOf(streamUrl), it.currentPosition) }
     }
 
     override fun onDestroy() {
