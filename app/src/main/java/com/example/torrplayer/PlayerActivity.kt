@@ -1,6 +1,5 @@
 package com.example.torrplayer
 
-import android.app.AlertDialog
 import android.content.Intent
 import android.media.audiofx.LoudnessEnhancer
 import android.net.Uri
@@ -208,7 +207,6 @@ class PlayerActivity : AppCompatActivity() {
 
         binding.btnSpeed.setOnClickListener { cycleSpeed() }
         binding.btnAspect.setOnClickListener { cycleAspect() }
-        binding.btnEpisodes.setOnClickListener { showEpisodesDialog() }
         binding.btnRetry.setOnClickListener { retryPlayback() }
 
         // Скрываем встроенную шестерёнку настроек ExoPlayer — она дублирует
@@ -327,6 +325,12 @@ class PlayerActivity : AppCompatActivity() {
                     }
                     return true
                 }
+                if (currentPanel == Panel.NONE) {
+                    // Не даём ExoPlayer самому перематывать по влево/вправо, когда панель
+                    // закрыта — перемотка теперь доступна только через открытую панель,
+                    // с фокусом именно на ползунке (иначе легко случайно перемотать видео).
+                    return true
+                }
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
                 if (currentPanel == Panel.NONE) {
@@ -437,6 +441,7 @@ class PlayerActivity : AppCompatActivity() {
         if (panel == Panel.CONTROLS) {
             populateAudioRow()
             populateSubsRow()
+            populateEpisodesRow()
             binding.playerView.controllerShowTimeoutMs = PANEL_AUTO_HIDE_MS.toInt()
             binding.playerView.showController()
             binding.playerView.findViewById<View>(androidx.media3.ui.R.id.exo_progress)?.requestFocus()
@@ -548,6 +553,40 @@ class PlayerActivity : AppCompatActivity() {
                 binding.audioRow.addView(btn)
                 first = false
             }
+        }
+    }
+
+    /**
+     * Список серий прямо в нижней панели, рядом с аудио/субтитрами — как плейлист:
+     * все серии видно сразу, выбор сразу переключает воспроизведение. Показывается,
+     * только если у торрента больше одного видеофайла.
+     */
+    private fun populateEpisodesRow() {
+        binding.episodesRow.removeAllViews()
+        if (episodeFiles.size < 2) {
+            binding.labelEpisodes.visibility = View.GONE
+            binding.episodesScroll.visibility = View.GONE
+            return
+        }
+        binding.labelEpisodes.visibility = View.VISIBLE
+        binding.episodesScroll.visibility = View.VISIBLE
+
+        val currentFileName = TorrServerUrlUtils.fileNameOf(streamUrl)
+        var first = true
+        episodeFiles.forEach { file ->
+            val name = file.path.substringAfterLast('/')
+            val isCurrent = name == currentFileName
+            val btn = Button(this).apply {
+                text = if (isCurrent) "● $name" else name
+                setOnClickListener {
+                    if (!isCurrent) switchToEpisode(file)
+                }
+            }
+            val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            if (!first) lp.marginStart = dpToPx(8)
+            btn.layoutParams = lp
+            binding.episodesRow.addView(btn)
+            first = false
         }
     }
 
@@ -836,7 +875,9 @@ class PlayerActivity : AppCompatActivity() {
                 .sortedWith(Comparator { a, b -> naturalCompare(a.path, b.path) })
             if (files.size > 1) {
                 episodeFiles = files
-                binding.btnEpisodes.visibility = View.VISIBLE
+                if (currentPanel == Panel.CONTROLS) {
+                    populateEpisodesRow()
+                }
             }
         }
     }
@@ -870,21 +911,6 @@ class PlayerActivity : AppCompatActivity() {
         val currentIndex = episodeFiles.indexOfFirst { it.path.substringAfterLast('/') == currentFileName }
         if (currentIndex == -1 || currentIndex + 1 >= episodeFiles.size) return null
         return episodeFiles[currentIndex + 1]
-    }
-
-    private fun showEpisodesDialog() {
-        if (episodeFiles.isEmpty()) return
-        val currentFileName = TorrServerUrlUtils.fileNameOf(streamUrl)
-        val labels = episodeFiles.map { it.path.substringAfterLast('/') }.toTypedArray()
-        val currentIndex = episodeFiles.indexOfFirst { it.path.substringAfterLast('/') == currentFileName }
-
-        AlertDialog.Builder(this)
-            .setTitle("Серии")
-            .setSingleChoiceItems(labels, currentIndex) { dialog, which ->
-                dialog.dismiss()
-                switchToEpisode(episodeFiles[which])
-            }
-            .show()
     }
 
     private fun switchToEpisode(file: TorrentFileStat) {
