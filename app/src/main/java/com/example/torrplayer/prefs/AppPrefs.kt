@@ -79,6 +79,14 @@ class AppPrefs(context: Context) {
         get() = sp.getBoolean(KEY_TUNNELING, false)
         set(value) = sp.edit().putBoolean(KEY_TUNNELING, value).apply()
 
+    /**
+     * Усиление громкости (Audio Gain) поверх декодированного звука, в дБ.
+     * 0 — выключено (звук как есть). Полезно для тихих дорожек в раздачах.
+     */
+    var audioGainDb: Int
+        get() = sp.getInt(KEY_AUDIO_GAIN_DB, 0)
+        set(value) = sp.edit().putInt(KEY_AUDIO_GAIN_DB, value).apply()
+
     fun savePosition(streamUrl: String, positionMs: Long) {
         sp.edit().putLong(posKey(streamUrl), positionMs).apply()
     }
@@ -102,5 +110,6 @@ class AppPrefs(context: Context) {
         private const val KEY_SUBTITLE_CHARSET = "subtitle_charset"
         private const val KEY_AUTO_NEXT = "auto_next_episode"
         private const val KEY_TUNNELING = "tunneling_enabled"
+        private const val KEY_AUDIO_GAIN_DB = "audio_gain_db"
     }
 }
