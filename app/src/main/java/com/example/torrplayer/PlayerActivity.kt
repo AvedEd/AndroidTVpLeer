@@ -133,6 +133,10 @@ class PlayerActivity : AppCompatActivity() {
                 binding.textBuffer.text = "Буфер: $bufferedPct%\n" +
                     "${Formatting.time(posMs)} / ${Formatting.time(durMs)}"
 
+                if (currentPanel == Panel.CONTROLS && !binding.seekBar.isPressed) {
+                    updateSeekBar()
+                }
+
                 val vf = it.videoFormat
                 val af = it.audioFormat
                 val videoLine = vf?.let { f ->
@@ -212,6 +216,9 @@ class PlayerActivity : AppCompatActivity() {
         // Скрываем встроенную шестерёнку настроек ExoPlayer — она дублирует
         // наши собственные панели аудио/субтитров/скорости.
         binding.playerView.findViewById<View>(androidx.media3.ui.R.id.exo_settings)?.visibility = View.GONE
+        // Скрываем встроенную полоску перемотки ExoPlayer — используем свою,
+        // первой в панели, чтобы порядок был предсказуемым (ползунок → аудио → субтитры).
+        binding.playerView.findViewById<View>(androidx.media3.ui.R.id.exo_progress)?.visibility = View.GONE
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -357,10 +364,7 @@ class PlayerActivity : AppCompatActivity() {
         return super.dispatchKeyEvent(event)
     }
 
-    private fun isTimeBarFocused(): Boolean {
-        val timeBar = binding.playerView.findViewById<View>(androidx.media3.ui.R.id.exo_progress)
-        return timeBar?.hasFocus() == true
-    }
+    private fun isTimeBarFocused(): Boolean = binding.seekBar.hasFocus()
 
     private fun parseExternalPlayerExtras() {
         incomingTitle = intent.getStringExtra("title")
@@ -422,6 +426,18 @@ class PlayerActivity : AppCompatActivity() {
         val durationMs = if (p.duration > 0) p.duration else Long.MAX_VALUE
         val target = (p.currentPosition + deltaSeconds * 1000L).coerceIn(0, durationMs)
         p.seekTo(target)
+        updateSeekBar()
+    }
+
+    /** Обновляет положение и подпись нашего ползунка на основе текущей позиции плеера. */
+    private fun updateSeekBar() {
+        val p = player ?: return
+        val durMs = p.duration
+        if (durMs <= 0) return
+        val posMs = p.currentPosition.coerceIn(0, durMs)
+        binding.seekBar.max = 1000
+        binding.seekBar.progress = ((posMs * 1000) / durMs).toInt()
+        binding.textSeekTime.text = "${Formatting.time(posMs)} / ${Formatting.time(durMs)}"
     }
 
     private fun togglePlayPause() {
@@ -434,17 +450,21 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun showPanel(panel: Panel) {
-        binding.panelControls.visibility = if (panel == Panel.CONTROLS) View.VISIBLE else View.GONE
-        binding.panelInfo.visibility = if (panel == Panel.INFO) View.VISIBLE else View.GONE
+        if (panel == Panel.CONTROLS) {
+            if (binding.panelInfo.visibility == View.VISIBLE) animateHide(binding.panelInfo)
+            animateShow(binding.panelControls)
+        } else {
+            if (binding.panelControls.visibility == View.VISIBLE) animateHide(binding.panelControls)
+            animateShow(binding.panelInfo)
+        }
         currentPanel = panel
 
         if (panel == Panel.CONTROLS) {
             populateAudioRow()
             populateSubsRow()
             populateEpisodesRow()
-            binding.playerView.controllerShowTimeoutMs = PANEL_AUTO_HIDE_MS.toInt()
-            binding.playerView.showController()
-            binding.playerView.findViewById<View>(androidx.media3.ui.R.id.exo_progress)?.requestFocus()
+            updateSeekBar()
+            binding.seekBar.requestFocus()
         }
 
         uiHandler.removeCallbacks(hidePanelRunnable)
@@ -452,15 +472,27 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun hideAllPanels() {
-        binding.panelControls.visibility = View.GONE
-        binding.panelInfo.visibility = View.GONE
+        if (binding.panelControls.visibility == View.VISIBLE) animateHide(binding.panelControls)
+        if (binding.panelInfo.visibility == View.VISIBLE) animateHide(binding.panelInfo)
         currentPanel = Panel.NONE
         uiHandler.removeCallbacks(hidePanelRunnable)
-        // Наша панель и встроенный контроллер ExoPlayer (ползунок/пауза) — два разных
-        // UI-элемента с независимыми таймерами. Без явного hideController() контроллер
-        // ExoPlayer оставался бы висеть до истечения своих 12 секунд, даже когда мы уже
-        // закрыли свою панель кнопкой "Назад".
         binding.playerView.hideController()
+    }
+
+    /** Плавное появление панели (fade-in), вместо мгновенного показа. */
+    private fun animateShow(view: View) {
+        view.animate().cancel()
+        view.alpha = 0f
+        view.visibility = View.VISIBLE
+        view.animate().alpha(1f).setDuration(180).start()
+    }
+
+    /** Плавное скрытие панели (fade-out), вместо мгновенного исчезновения. */
+    private fun animateHide(view: View) {
+        view.animate().cancel()
+        view.animate().alpha(0f).setDuration(150)
+            .withEndAction { view.visibility = View.GONE }
+            .start()
     }
 
     /**
@@ -471,9 +503,6 @@ class PlayerActivity : AppCompatActivity() {
         uiHandler.removeCallbacks(hidePanelRunnable)
         if (currentPanel != Panel.NONE) {
             uiHandler.postDelayed(hidePanelRunnable, PANEL_AUTO_HIDE_MS)
-            if (currentPanel == Panel.CONTROLS) {
-                binding.playerView.showController()
-            }
         }
     }
 
@@ -866,13 +895,46 @@ class PlayerActivity : AppCompatActivity() {
     private fun loadEpisodesInBackground() {
         val h = hash
         val client = statsClient
-        if (h == null || client == null) return
+        if (h == null || client == null) {
+            Toast.makeText(
+                this,
+                "Диагностика: не удалось определить hash торрента или адрес TorrServer из ссылки",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
 
         lifecycleScope.launch {
-            val info = withContext(Dispatchers.IO) { try { client.getTorrent(h) } catch (e: Exception) { null } }
-            val files = info?.fileStats.orEmpty()
+            var errorMessage: String? = null
+            val info = withContext(Dispatchers.IO) {
+                try {
+                    client.getTorrent(h)
+                } catch (e: Exception) {
+                    errorMessage = e.message ?: e.toString()
+                    null
+                }
+            }
+
+            if (errorMessage != null) {
+                Toast.makeText(
+                    this@PlayerActivity,
+                    "Диагностика: ошибка запроса к TorrServer — $errorMessage",
+                    Toast.LENGTH_LONG
+                ).show()
+                return@launch
+            }
+
+            val allFiles = info?.fileStats.orEmpty()
+            val files = allFiles
                 .filter { isVideoFile(it.path) }
                 .sortedWith(Comparator { a, b -> naturalCompare(a.path, b.path) })
+
+            Toast.makeText(
+                this@PlayerActivity,
+                "Диагностика: TorrServer вернул файлов — ${allFiles.size}, из них видео — ${files.size}",
+                Toast.LENGTH_LONG
+            ).show()
+
             if (files.size > 1) {
                 episodeFiles = files
                 if (currentPanel == Panel.CONTROLS) {
