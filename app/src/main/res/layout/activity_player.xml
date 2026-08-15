@@ -153,6 +153,13 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:text="По размеру" />
+
+            <Button
+                android:id="@+id/btn_restart"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="Сначала" />
         </LinearLayout>
     </LinearLayout>
 
