@@ -1,5 +1,7 @@
 package com.example.torrplayer.torrserver
 
+import com.google.gson.GsonBuilder
+import com.google.gson.JsonDeserializer
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -21,12 +23,32 @@ class TorrServerClient(private val host: String, private val scheme: String = "h
         .readTimeout(10, TimeUnit.SECONDS)
         .build()
 
+    /**
+     * Поле "stat" в ответе TorrServer на разных версиях сервера приходит по-разному —
+     * иногда объектом с полями (download_speed, peers, ...), а иногда просто числом.
+     * Без этого терпимого разбора несовпадение формата ронял бы разбор ВСЕГО ответа
+     * целиком, включая file_stats — из-за чего пропадал бы список серий и переставал
+     * работать автопереход, хотя сами файлы сервер прислал нормально.
+     */
+    private val gson = GsonBuilder()
+        .registerTypeAdapter(
+            TorrentStat::class.java,
+            JsonDeserializer<TorrentStat?> { json, _, context ->
+                if (json != null && json.isJsonObject) {
+                    context.deserialize(json, TorrentStat::class.java)
+                } else {
+                    null
+                }
+            }
+        )
+        .create()
+
     private val api: TorrServerApi by lazy {
         val base = "$scheme://$host/"
         Retrofit.Builder()
             .baseUrl(base)
             .client(http)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
             .create(TorrServerApi::class.java)
     }
