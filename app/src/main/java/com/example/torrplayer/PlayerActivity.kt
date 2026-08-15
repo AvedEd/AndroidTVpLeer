@@ -211,6 +211,7 @@ class PlayerActivity : AppCompatActivity() {
 
         binding.btnSpeed.setOnClickListener { cycleSpeed() }
         binding.btnAspect.setOnClickListener { cycleAspect() }
+        binding.btnRestart.setOnClickListener { restartFromBeginning() }
         binding.btnRetry.setOnClickListener { retryPlayback() }
 
         // Скрываем встроенную шестерёнку настроек ExoPlayer — она дублирует
@@ -861,6 +862,15 @@ class PlayerActivity : AppCompatActivity() {
             it.prepare()
             it.playWhenReady = true
         }
+    }
+
+    private fun restartFromBeginning() {
+        player?.let {
+            it.seekTo(0)
+            it.playWhenReady = true
+            updateSeekBar()
+        }
+        Toast.makeText(this, "Сначала", Toast.LENGTH_SHORT).show()
     }
 
     private fun adjustDisplayRefreshRate(contentFrameRate: Float) {
