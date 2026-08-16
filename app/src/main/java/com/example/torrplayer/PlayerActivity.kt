@@ -78,7 +78,7 @@ class PlayerActivity : AppCompatActivity() {
         )
     }
 
-    private enum class Panel { NONE, CONTROLS, INFO }
+    private enum class Panel { NONE, CONTROLS, INFO, EPISODES }
 
     private lateinit var binding: ActivityPlayerBinding
     private lateinit var prefs: AppPrefs
@@ -94,6 +94,15 @@ class PlayerActivity : AppCompatActivity() {
     private var lastAppliedFrameRate = 0f
     private var lastBackPressAt = 0L
     private var episodeFiles: List<TorrentFileStat> = emptyList()
+    /**
+     * Числовой id (в терминах TorrServer — "index") сейчас играющего файла внутри
+     * торрента. Раньше "текущую серию" определяли сравнением имени файла из URL с
+     * именами из file_stats — это ломалось, если TorrServer/Lampa присылали ссылку
+     * в формате, где имя файла не совпадает буквально (кодирование, регистр и т.п.).
+     * Число же в query-параметре index= сравнивать не с чем — оно либо совпадает,
+     * либо нет, без вариантов.
+     */
+    private var currentEpisodeFileId: Int? = null
 
     private var incomingTitle: String? = null
     private var externalStartPositionMs: Long? = null
@@ -190,6 +199,7 @@ class PlayerActivity : AppCompatActivity() {
         }
         streamUrl = resolved.first
         hash = resolved.second
+        currentEpisodeFileId = TorrServerUrlUtils.indexOf(streamUrl)
 
         parseExternalPlayerExtras()
 
@@ -212,6 +222,7 @@ class PlayerActivity : AppCompatActivity() {
         binding.btnSpeed.setOnClickListener { cycleSpeed() }
         binding.btnAspect.setOnClickListener { cycleAspect() }
         binding.btnRestart.setOnClickListener { restartFromBeginning() }
+        binding.btnPlaylist.setOnClickListener { togglePanel(Panel.EPISODES) }
         binding.btnRetry.setOnClickListener { retryPlayback() }
 
         // Скрываем встроенную шестерёнку настроек ExoPlayer — она дублирует
@@ -451,21 +462,28 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun showPanel(panel: Panel) {
-        if (panel == Panel.CONTROLS) {
-            if (binding.panelInfo.visibility == View.VISIBLE) animateHide(binding.panelInfo)
-            animateShow(binding.panelControls)
-        } else {
-            if (binding.panelControls.visibility == View.VISIBLE) animateHide(binding.panelControls)
-            animateShow(binding.panelInfo)
+        val target = when (panel) {
+            Panel.CONTROLS -> binding.panelControls
+            Panel.INFO -> binding.panelInfo
+            Panel.EPISODES -> binding.panelEpisodes
+            Panel.NONE -> null
+        } ?: return
+
+        listOf(binding.panelControls, binding.panelInfo, binding.panelEpisodes).forEach { v ->
+            if (v !== target && v.visibility == View.VISIBLE) animateHide(v)
         }
+        animateShow(target)
         currentPanel = panel
 
-        if (panel == Panel.CONTROLS) {
-            populateAudioRow()
-            populateSubsRow()
-            populateEpisodesRow()
-            updateSeekBar()
-            binding.seekBar.requestFocus()
+        when (panel) {
+            Panel.CONTROLS -> {
+                populateAudioRow()
+                populateSubsRow()
+                updateSeekBar()
+                binding.seekBar.requestFocus()
+            }
+            Panel.EPISODES -> populatePlaylistPanel()
+            else -> {}
         }
 
         uiHandler.removeCallbacks(hidePanelRunnable)
@@ -473,8 +491,9 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun hideAllPanels() {
-        if (binding.panelControls.visibility == View.VISIBLE) animateHide(binding.panelControls)
-        if (binding.panelInfo.visibility == View.VISIBLE) animateHide(binding.panelInfo)
+        listOf(binding.panelControls, binding.panelInfo, binding.panelEpisodes).forEach {
+            if (it.visibility == View.VISIBLE) animateHide(it)
+        }
         currentPanel = Panel.NONE
         uiHandler.removeCallbacks(hidePanelRunnable)
         binding.playerView.hideController()
@@ -587,35 +606,27 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     /**
-     * Список серий прямо в нижней панели, рядом с аудио/субтитрами — как плейлист:
-     * все серии видно сразу, выбор сразу переключает воспроизведение. Показывается,
-     * только если у торрента больше одного видеофайла.
+     * Плейлист серий — отдельная панель в правом углу, столбиком, открывается
+     * кнопкой "Плейлист". Показывается, только если у торрента больше одного
+     * видеофайла.
      */
-    private fun populateEpisodesRow() {
-        binding.episodesRow.removeAllViews()
-        if (episodeFiles.size < 2) {
-            binding.labelEpisodes.visibility = View.GONE
-            binding.episodesScroll.visibility = View.GONE
-            return
-        }
-        binding.labelEpisodes.visibility = View.VISIBLE
-        binding.episodesScroll.visibility = View.VISIBLE
-
+    private fun populatePlaylistPanel() {
+        binding.playlistList.removeAllViews()
         val currentFileName = TorrServerUrlUtils.fileNameOf(streamUrl)
         var first = true
         episodeFiles.forEach { file ->
             val name = file.path.substringAfterLast('/')
-            val isCurrent = name == currentFileName
+            val isCurrent = file.id == currentEpisodeFileId || name == currentFileName
             val btn = Button(this).apply {
                 text = if (isCurrent) "● $name" else name
                 setOnClickListener {
                     if (!isCurrent) switchToEpisode(file)
                 }
             }
-            val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-            if (!first) lp.marginStart = dpToPx(8)
+            val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            if (!first) lp.topMargin = dpToPx(8)
             btn.layoutParams = lp
-            binding.episodesRow.addView(btn)
+            binding.playlistList.addView(btn)
             first = false
         }
     }
@@ -914,8 +925,9 @@ class PlayerActivity : AppCompatActivity() {
                 .sortedWith(Comparator { a, b -> naturalCompare(a.path, b.path) })
             if (files.size > 1) {
                 episodeFiles = files
-                if (currentPanel == Panel.CONTROLS) {
-                    populateEpisodesRow()
+                binding.btnPlaylist.visibility = View.VISIBLE
+                if (currentPanel == Panel.EPISODES) {
+                    populatePlaylistPanel()
                 }
             }
         }
@@ -946,8 +958,13 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun nextEpisode(): TorrentFileStat? {
         if (episodeFiles.size < 2) return null
-        val currentFileName = TorrServerUrlUtils.fileNameOf(streamUrl)
-        val currentIndex = episodeFiles.indexOfFirst { it.path.substringAfterLast('/') == currentFileName }
+        val currentId = currentEpisodeFileId
+        val currentIndex = if (currentId != null) {
+            episodeFiles.indexOfFirst { it.id == currentId }
+        } else {
+            val currentFileName = TorrServerUrlUtils.fileNameOf(streamUrl)
+            episodeFiles.indexOfFirst { it.path.substringAfterLast('/') == currentFileName }
+        }
         if (currentIndex == -1 || currentIndex + 1 >= episodeFiles.size) return null
         return episodeFiles[currentIndex + 1]
     }
@@ -963,6 +980,7 @@ class PlayerActivity : AppCompatActivity() {
         player?.let { prefs.savePosition(fileName, it.currentPosition) }
 
         streamUrl = newUrl
+        currentEpisodeFileId = file.id
         hideAllPanels()
         binding.errorBanner.visibility = View.GONE
 
