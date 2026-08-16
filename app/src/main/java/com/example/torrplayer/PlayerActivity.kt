@@ -224,6 +224,11 @@ class PlayerActivity : AppCompatActivity() {
         binding.btnRestart.setOnClickListener { restartFromBeginning() }
         binding.btnPlaylist.setOnClickListener { togglePanel(Panel.EPISODES) }
         binding.btnRetry.setOnClickListener { retryPlayback() }
+        binding.btnPrevEpisode.setOnClickListener { goToPreviousEpisode() }
+        binding.btnSeekBack.setOnClickListener { performSeek(-prefs.seekStepSeconds) }
+        binding.btnPlayPause.setOnClickListener { togglePlayPause() }
+        binding.btnSeekForward.setOnClickListener { performSeek(prefs.seekStepSeconds) }
+        binding.btnNextEpisode.setOnClickListener { goToNextEpisode() }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -448,6 +453,9 @@ class PlayerActivity : AppCompatActivity() {
     private fun togglePlayPause() {
         val p = player ?: return
         p.playWhenReady = !p.playWhenReady
+        if (currentPanel == Panel.CONTROLS) {
+            binding.btnPlayPause.text = if (p.playWhenReady) "⏸" else "▶"
+        }
     }
 
     private fun togglePanel(panel: Panel) {
@@ -466,6 +474,13 @@ class PlayerActivity : AppCompatActivity() {
             if (v !== target && v.visibility == View.VISIBLE) animateHide(v)
         }
         animateShow(target)
+
+        if (panel == Panel.CONTROLS) {
+            animateShow(binding.panelTransport)
+        } else if (binding.panelTransport.visibility == View.VISIBLE) {
+            animateHide(binding.panelTransport)
+        }
+
         currentPanel = panel
 
         when (panel) {
@@ -473,6 +488,7 @@ class PlayerActivity : AppCompatActivity() {
                 populateAudioRow()
                 populateSubsRow()
                 updateSeekBar()
+                updateTransportButtons()
                 binding.seekBar.requestFocus()
             }
             Panel.EPISODES -> {
@@ -487,12 +503,51 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun hideAllPanels() {
-        listOf(binding.panelControls, binding.panelInfo, binding.panelEpisodes).forEach {
+        listOf(binding.panelControls, binding.panelInfo, binding.panelEpisodes, binding.panelTransport).forEach {
             if (it.visibility == View.VISIBLE) animateHide(it)
         }
         currentPanel = Panel.NONE
         uiHandler.removeCallbacks(hidePanelRunnable)
         binding.playerView.hideController()
+    }
+
+    /** Показывает/прячет кнопки предыдущей/следующей серии и обновляет иконку паузы/плей. */
+    private fun updateTransportButtons() {
+        binding.btnPlayPause.text = if (player?.playWhenReady == true) "⏸" else "▶"
+        val hasSeries = episodeFiles.size > 1
+        binding.btnPrevEpisode.visibility = if (hasSeries) View.VISIBLE else View.GONE
+        binding.btnNextEpisode.visibility = if (hasSeries) View.VISIBLE else View.GONE
+    }
+
+    private fun goToNextEpisode() {
+        val next = nextEpisode()
+        if (next != null) {
+            switchToEpisode(next)
+        } else {
+            Toast.makeText(this, "Это последняя серия", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun goToPreviousEpisode() {
+        val prev = previousEpisode()
+        if (prev != null) {
+            switchToEpisode(prev)
+        } else {
+            Toast.makeText(this, "Это первая серия", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun previousEpisode(): TorrentFileStat? {
+        if (episodeFiles.size < 2) return null
+        val currentId = currentEpisodeFileId
+        val currentIndex = if (currentId != null) {
+            episodeFiles.indexOfFirst { it.id == currentId }
+        } else {
+            val currentFileName = TorrServerUrlUtils.fileNameOf(streamUrl)
+            episodeFiles.indexOfFirst { it.path.substringAfterLast('/') == currentFileName }
+        }
+        if (currentIndex <= 0) return null
+        return episodeFiles[currentIndex - 1]
     }
 
     /** Плавное появление панели (fade-in), вместо мгновенного показа. */
@@ -922,6 +977,9 @@ class PlayerActivity : AppCompatActivity() {
             if (files.size > 1) {
                 episodeFiles = files
                 binding.btnPlaylist.visibility = View.VISIBLE
+                if (currentPanel == Panel.CONTROLS) {
+                    updateTransportButtons()
+                }
                 if (currentPanel == Panel.EPISODES) {
                     populatePlaylistPanel()
                 }
