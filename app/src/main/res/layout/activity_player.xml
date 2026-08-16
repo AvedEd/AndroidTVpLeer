@@ -146,6 +146,53 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/panel_transport"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/panel_background"
+        android:orientation="horizontal"
+        android:padding="14dp"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/btn_prev_episode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⏮"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btn_seek_back"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="⏪" />
+
+        <Button
+            android:id="@+id/btn_play_pause"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="▶" />
+
+        <Button
+            android:id="@+id/btn_seek_forward"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="⏩" />
+
+        <Button
+            android:id="@+id/btn_next_episode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="⏭"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout
         android:id="@+id/panel_episodes"
         android:layout_width="260dp"
         android:layout_height="wrap_content"
