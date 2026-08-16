@@ -103,6 +103,7 @@ class PlayerActivity : AppCompatActivity() {
      * либо нет, без вариантов.
      */
     private var currentEpisodeFileId: Int? = null
+    private var switchingEpisode = false
 
     private var incomingTitle: String? = null
     private var externalStartPositionMs: Long? = null
@@ -492,8 +493,8 @@ class PlayerActivity : AppCompatActivity() {
                 binding.seekBar.requestFocus()
             }
             Panel.EPISODES -> {
-                populatePlaylistPanel()
-                binding.playlistList.getChildAt(0)?.requestFocus()
+                val currentIndex = populatePlaylistPanel()
+                binding.playlistList.getChildAt(currentIndex)?.requestFocus()
             }
             else -> {}
         }
@@ -520,8 +521,10 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun goToNextEpisode() {
+        if (switchingEpisode) return
         val next = nextEpisode()
         if (next != null) {
+            Toast.makeText(this, "Следующая серия…", Toast.LENGTH_SHORT).show()
             switchToEpisode(next)
         } else {
             Toast.makeText(this, "Это последняя серия", Toast.LENGTH_SHORT).show()
@@ -529,8 +532,10 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun goToPreviousEpisode() {
+        if (switchingEpisode) return
         val prev = previousEpisode()
         if (prev != null) {
+            Toast.makeText(this, "Предыдущая серия…", Toast.LENGTH_SHORT).show()
             switchToEpisode(prev)
         } else {
             Toast.makeText(this, "Это первая серия", Toast.LENGTH_SHORT).show()
@@ -659,15 +664,18 @@ class PlayerActivity : AppCompatActivity() {
     /**
      * Плейлист серий — отдельная панель в правом углу, столбиком, открывается
      * кнопкой "Плейлист". Показывается, только если у торрента больше одного
-     * видеофайла.
+     * видеофайла. Возвращает индекс кнопки текущей серии — чтобы вызывающий код
+     * поставил на неё фокус (а не всегда на первую), и ScrollView сам прокрутил
+     * список так, чтобы она была видна.
      */
-    private fun populatePlaylistPanel() {
+    private fun populatePlaylistPanel(): Int {
         binding.playlistList.removeAllViews()
         val currentFileName = TorrServerUrlUtils.fileNameOf(streamUrl)
-        var first = true
-        episodeFiles.forEach { file ->
+        var currentIndex = 0
+        episodeFiles.forEachIndexed { index, file ->
             val name = file.path.substringAfterLast('/')
             val isCurrent = file.id == currentEpisodeFileId || name == currentFileName
+            if (isCurrent) currentIndex = index
             val btn = Button(this).apply {
                 text = if (isCurrent) "● $name" else name
                 setOnClickListener {
@@ -675,11 +683,11 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
             val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-            if (!first) lp.topMargin = dpToPx(8)
+            if (index > 0) lp.topMargin = dpToPx(8)
             btn.layoutParams = lp
             binding.playlistList.addView(btn)
-            first = false
         }
+        return currentIndex
     }
 
     private fun populateSubsRow() {
@@ -1031,6 +1039,7 @@ class PlayerActivity : AppCompatActivity() {
         val encodedName = URLEncoder.encode(fileName, "UTF-8")
         val newUrl = "$scheme://$host/stream/$encodedName?link=$h&index=${file.id}&play"
 
+        switchingEpisode = true
         player?.let { prefs.savePosition(fileName, it.currentPosition) }
 
         streamUrl = newUrl
@@ -1039,6 +1048,7 @@ class PlayerActivity : AppCompatActivity() {
         binding.errorBanner.visibility = View.GONE
 
         player?.let { startPlayback(it, streamUrl) }
+        uiHandler.postDelayed({ switchingEpisode = false }, 1500)
     }
 
     private fun cycleAspect() {
