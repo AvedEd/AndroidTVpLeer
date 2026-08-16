@@ -129,13 +129,6 @@
                 android:text="По размеру" />
 
             <Button
-                android:id="@+id/btn_restart"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="Сначала" />
-
-            <Button
                 android:id="@+id/btn_playlist"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -156,9 +149,16 @@
         android:visibility="gone">
 
         <Button
+            android:id="@+id/btn_restart"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Сначала" />
+
+        <Button
             android:id="@+id/btn_prev_episode"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
             android:text="⏮"
             android:visibility="gone" />
 
