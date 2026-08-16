@@ -313,13 +313,13 @@ class PlayerActivity : AppCompatActivity() {
 
         when (event.keyCode) {
             KeyEvent.KEYCODE_DPAD_DOWN -> {
-                if (event.action == KeyEvent.ACTION_DOWN && currentPanel != Panel.CONTROLS) {
+                if (event.action == KeyEvent.ACTION_DOWN && currentPanel == Panel.NONE) {
                     togglePanel(Panel.CONTROLS)
                     return true
                 }
             }
             KeyEvent.KEYCODE_DPAD_UP -> {
-                if (event.action == KeyEvent.ACTION_DOWN && currentPanel != Panel.INFO && currentPanel != Panel.CONTROLS) {
+                if (event.action == KeyEvent.ACTION_DOWN && currentPanel == Panel.NONE) {
                     togglePanel(Panel.INFO)
                     return true
                 }
@@ -482,7 +482,10 @@ class PlayerActivity : AppCompatActivity() {
                 updateSeekBar()
                 binding.seekBar.requestFocus()
             }
-            Panel.EPISODES -> populatePlaylistPanel()
+            Panel.EPISODES -> {
+                populatePlaylistPanel()
+                binding.playlistList.getChildAt(0)?.requestFocus()
+            }
             else -> {}
         }
 
