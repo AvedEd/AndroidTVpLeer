@@ -225,13 +225,6 @@ class PlayerActivity : AppCompatActivity() {
         binding.btnPlaylist.setOnClickListener { togglePanel(Panel.EPISODES) }
         binding.btnRetry.setOnClickListener { retryPlayback() }
 
-        // Скрываем встроенную шестерёнку настроек ExoPlayer — она дублирует
-        // наши собственные панели аудио/субтитров/скорости.
-        binding.playerView.findViewById<View>(androidx.media3.ui.R.id.exo_settings)?.visibility = View.GONE
-        // Скрываем встроенную полоску перемотки ExoPlayer — используем свою,
-        // первой в панели, чтобы порядок был предсказуемым (ползунок → аудио → субтитры).
-        binding.playerView.findViewById<View>(androidx.media3.ui.R.id.exo_progress)?.visibility = View.GONE
-
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (currentPanel != Panel.NONE) {
