@@ -30,4 +30,18 @@ object TorrServerUrlUtils {
 
     fun fileNameOf(streamUrl: String): String =
         Uri.parse(streamUrl).lastPathSegment ?: "video"
+
+    /**
+     * Значение query-параметра index=N (порядковый номер файла внутри торрента на
+     * стороне TorrServer), если он есть в ссылке. Это надёжнее, чем сверять имена
+     * файлов строками — их кодирование в URL может отличаться от того, что реально
+     * прислал TorrServer в file_stats, а index — просто целое число, тут сверяться
+     * не с чем.
+     */
+    fun indexOf(streamUrl: String): Int? =
+        try {
+            Uri.parse(streamUrl).getQueryParameter("index")?.toIntOrNull()
+        } catch (e: Exception) {
+            null
+        }
 }
