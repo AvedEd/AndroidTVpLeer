@@ -116,23 +116,9 @@
             android:orientation="horizontal">
 
             <Button
-                android:id="@+id/btn_speed"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="1.0x" />
-
-            <Button
-                android:id="@+id/btn_aspect"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="По размеру" />
-
-            <Button
                 android:id="@+id/btn_playlist"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
                 android:text="Плейлист"
                 android:visibility="gone" />
         </LinearLayout>
@@ -149,16 +135,9 @@
         android:visibility="gone">
 
         <Button
-            android:id="@+id/btn_restart"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Сначала" />
-
-        <Button
             android:id="@+id/btn_prev_episode"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
             android:text="⏮"
             android:visibility="gone" />
 
