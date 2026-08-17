@@ -57,7 +57,6 @@ class PlayerActivity : AppCompatActivity() {
             AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
             AspectRatioFrameLayout.RESIZE_MODE_FILL
         )
-        private val RESIZE_LABELS = arrayOf("По размеру", "Обрезать", "Растянуть")
 
         private const val SEEK_TICK_MS = 300L
         private const val SEEK_ACCEL_STAGE1_MS = 1500L
@@ -163,7 +162,7 @@ class PlayerActivity : AppCompatActivity() {
 
                 vf?.frameRate?.takeIf { fr -> fr > 0f }?.let { adjustDisplayRefreshRate(it) }
             }
-            uiHandler.postDelayed(this, 1000)
+            uiHandler.postDelayed(this, 500)
         }
     }
 
@@ -220,9 +219,6 @@ class PlayerActivity : AppCompatActivity() {
             uiHandler.postDelayed({ binding.textTitle.visibility = View.GONE }, 5000)
         }
 
-        binding.btnSpeed.setOnClickListener { cycleSpeed() }
-        binding.btnAspect.setOnClickListener { cycleAspect() }
-        binding.btnRestart.setOnClickListener { restartFromBeginning() }
         binding.btnPlaylist.setOnClickListener { togglePanel(Panel.EPISODES) }
         binding.btnRetry.setOnClickListener { retryPlayback() }
         binding.btnPrevEpisode.setOnClickListener { goToPreviousEpisode() }
@@ -249,7 +245,6 @@ class PlayerActivity : AppCompatActivity() {
 
         aspectIndex = RESIZE_MODES.indexOf(prefs.resizeMode).coerceAtLeast(0)
         binding.playerView.resizeMode = RESIZE_MODES[aspectIndex]
-        binding.btnAspect.text = RESIZE_LABELS[aspectIndex]
 
         loadEpisodesInBackground()
 
@@ -800,7 +795,6 @@ class PlayerActivity : AppCompatActivity() {
         speedIndex = closestSpeedIndex(prefs.playbackSpeed)
         val startSpeed = SPEEDS[speedIndex]
         exoPlayer.playbackParameters = PlaybackParameters(startSpeed)
-        binding.btnSpeed.text = "${startSpeed}x"
 
         startPlayback(exoPlayer, streamUrl)
 
@@ -934,15 +928,6 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun restartFromBeginning() {
-        player?.let {
-            it.seekTo(0)
-            it.playWhenReady = true
-            updateSeekBar()
-        }
-        Toast.makeText(this, "Сначала", Toast.LENGTH_SHORT).show()
-    }
-
     private fun adjustDisplayRefreshRate(contentFrameRate: Float) {
         if (contentFrameRate == lastAppliedFrameRate) return
         lastAppliedFrameRate = contentFrameRate
@@ -1049,21 +1034,6 @@ class PlayerActivity : AppCompatActivity() {
 
         player?.let { startPlayback(it, streamUrl) }
         uiHandler.postDelayed({ switchingEpisode = false }, 1500)
-    }
-
-    private fun cycleAspect() {
-        aspectIndex = (aspectIndex + 1) % RESIZE_MODES.size
-        binding.playerView.resizeMode = RESIZE_MODES[aspectIndex]
-        binding.btnAspect.text = RESIZE_LABELS[aspectIndex]
-        prefs.resizeMode = RESIZE_MODES[aspectIndex]
-    }
-
-    private fun cycleSpeed() {
-        speedIndex = (speedIndex + 1) % SPEEDS.size
-        val speed = SPEEDS[speedIndex]
-        player?.playbackParameters = PlaybackParameters(speed)
-        binding.btnSpeed.text = "${speed}x"
-        prefs.playbackSpeed = speed
     }
 
     override fun onStop() {
