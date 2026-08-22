@@ -3,7 +3,6 @@ package com.example.torrplayer
 import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
-import android.view.View
 import android.view.animation.AnimationUtils
 import android.widget.Button
 import android.widget.Toast
@@ -67,9 +66,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Настраивает эффект фокуса для кнопки
-     */
     private fun setupFocusEffect(button: Button) {
         val focusAnimation = AnimationUtils.loadAnimation(this, R.anim.tv_focus_animation)
         val unfocusAnimation = AnimationUtils.loadAnimation(this, R.anim.tv_unfocus_animation)
@@ -78,7 +74,6 @@ class MainActivity : AppCompatActivity() {
             if (hasFocus) {
                 button.startAnimation(focusAnimation)
                 button.setTextColor(resources.getColor(R.color.text_primary))
-                // Подсвечиваем кнопку
                 button.elevation = 16f
                 button.scaleX = 1.05f
                 button.scaleY = 1.05f
@@ -104,7 +99,6 @@ class MainActivity : AppCompatActivity() {
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                    // Клик по кнопке в фокусе
                     buttons.getOrNull(currentFocusIndex)?.performClick()
                     return true
                 }
