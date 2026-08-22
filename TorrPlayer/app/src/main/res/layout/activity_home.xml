@@ -5,30 +5,50 @@
     android:background="@color/background"
     android:gravity="center"
     android:orientation="vertical"
-    android:padding="48dp">
+    android:padding="24dp">
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/app_name"
-        android:textColor="@color/accent"
-        android:textSize="34sp"
+        android:text="TorrPlayer"
+        android:textColor="@color/text_primary"
+        android:textSize="32sp"
         android:textStyle="bold" />
 
     <TextView
-        android:layout_width="640dp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:gravity="center"
-        android:text="@string/home_description"
+        android:layout_marginTop="8dp"
+        android:text="Android TV плеер с поддержкой торрентов"
         android:textColor="@color/text_secondary"
         android:textSize="16sp" />
 
     <Button
-        android:id="@+id/btn_settings"
-        android:layout_width="wrap_content"
+        android:id="@+id/btn_open_player"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
-        android:text="@string/settings" />
+        android:text="Открыть плеер (тест)" />
+
+    <Button
+        android:id="@+id/btn_switch_decoder"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Переключить декодер (HW/SW)" />
+
+    <Button
+        android:id="@+id/btn_check_updates"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Проверить обновления" />
+
+    <Button
+        android:id="@+id/btn_settings"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Настройки" />
 
 </LinearLayout>
