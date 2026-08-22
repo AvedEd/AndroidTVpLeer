@@ -1,10 +1,14 @@
 package com.example.torrplayer.update
 
 import android.app.DownloadManager
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
 import android.os.Environment
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -27,9 +31,6 @@ class UpdateManager(private val context: Context) {
         val changelog: String
     )
 
-    /**
-     * Проверяет наличие обновлений на GitHub (ручной вызов)
-     */
     suspend fun checkForUpdates(): UpdateInfo? = withContext(Dispatchers.IO) {
         try {
             val url = URL(GITHUB_API)
@@ -76,9 +77,10 @@ class UpdateManager(private val context: Context) {
     }
 
     /**
-     * Скачивает обновление (ручной вызов)
+     * Скачивает обновление и автоматически открывает установщик,
+     * как только загрузка завершится.
      */
-    fun downloadUpdate(updateInfo: UpdateInfo): Long {
+    fun downloadUpdate(updateInfo: UpdateInfo) {
         val fileName = "torrplayer_${updateInfo.versionName}.apk"
         val destinationFile = File(
             context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
@@ -97,12 +99,28 @@ class UpdateManager(private val context: Context) {
             .setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE)
 
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        return downloadManager.enqueue(request)
+        val downloadId = downloadManager.enqueue(request)
+
+        // Слушаем завершение именно этой загрузки и сразу открываем установщик -
+        // раньше приложение просто скачивало файл и на этом останавливалось.
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context, intent: Intent) {
+                val completedId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
+                if (completedId == downloadId) {
+                    context.unregisterReceiver(this)
+                    installUpdate(destinationFile.absolutePath)
+                }
+            }
+        }
+
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
     }
 
-    /**
-     * Устанавливает скачанный APK (ручной вызов)
-     */
     fun installUpdate(filePath: String) {
         val file = File(filePath)
         if (!file.exists()) {
@@ -110,7 +128,7 @@ class UpdateManager(private val context: Context) {
             return
         }
 
-        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW)
+        val intent = Intent(Intent.ACTION_VIEW)
         intent.setDataAndType(
             androidx.core.content.FileProvider.getUriForFile(
                 context,
@@ -119,8 +137,8 @@ class UpdateManager(private val context: Context) {
             ),
             "application/vnd.android.package-archive"
         )
-        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-        intent.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
         try {
             context.startActivity(intent)
