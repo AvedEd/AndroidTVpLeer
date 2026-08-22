@@ -10,11 +10,13 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.common.util.UnstableApi
 import com.example.torrplayer.databinding.ActivityPlayerBinding
 import com.example.torrplayer.player.DecoderHelper
 import com.example.torrplayer.prefs.AppPrefs
 import com.example.torrplayer.util.TorrServerUrlUtils
 
+@UnstableApi
 class PlayerActivity : AppCompatActivity() {
 
     companion object {
