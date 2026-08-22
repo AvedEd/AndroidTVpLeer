@@ -3,8 +3,8 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'  # Запускается при создании тега v1.0.0
-  workflow_dispatch:  # Можно запустить вручную
+      - 'v*'
+  workflow_dispatch:  # ЭТО ВКЛЮЧАЕТ КНОПКУ "Run workflow"
 
 jobs:
   build:
@@ -38,7 +38,7 @@ jobs:
         alias: ${{ secrets.ALIAS }}
         keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
         keyPassword: ${{ secrets.KEY_PASSWORD }}
-      continue-on-error: true  # НЕ ОСТАНАВЛИВАЕТ СБОРКУ ПРИ ОШИБКЕ
+      continue-on-error: true
 
     - name: Verify APK signature
       id: verify_apk
@@ -50,7 +50,7 @@ jobs:
         else
           echo "APK not found, skipping verification..."
         fi
-      continue-on-error: true  # НЕ ОСТАНАВЛИВАЕТ СБОРКУ ПРИ ОШИБКЕ
+      continue-on-error: true
 
     - name: Create Release
       id: create_release
@@ -64,7 +64,7 @@ jobs:
           app/build/outputs/apk/release/app-release.apk
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      continue-on-error: true  # НЕ ОСТАНАВЛИВАЕТ СБОРКУ ПРИ ОШИБКЕ
+      continue-on-error: true
 
     - name: Upload APK as artifact
       uses: actions/upload-artifact@v4
