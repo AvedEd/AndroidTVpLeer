@@ -30,33 +30,16 @@ jobs:
         cd $GITHUB_WORKSPACE
         gradle assembleRelease
 
-    # ШАГ ПОДПИСИ ВРЕМЕННО ОТКЛЮЧЁН
-    # - name: Sign APK (if keystore exists)
-    #   uses: r0adkll/sign-android-release@v1
-    #   id: sign_app
-    #   with:
-    #     releaseDirectory: app/build/outputs/apk/release
-    #     signingKeyBase64: ${{ secrets.SIGNING_KEY }}
-    #     alias: ${{ secrets.ALIAS }}
-    #     keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-    #     keyPassword: ${{ secrets.KEY_PASSWORD }}
-    #   continue-on-error: true
-
-    - name: Verify APK signature
-      id: verify_apk
-      run: |
-        if [ -f "app/build/outputs/apk/release/app-release.apk" ]; then
-          echo "APK found, verifying signature..."
-          keytool -printcert -jarfile app/build/outputs/apk/release/app-release.apk
-          echo "APK verification completed successfully!"
-        else
-          echo "APK not found, skipping verification..."
-        fi
-      continue-on-error: true
+    - name: Upload APK as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-release
+        path: app/build/outputs/apk/release/app-release.apk
 
     - name: Create Release
       id: create_release
       uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
       with:
         name: TorrPlayer ${{ github.ref_name }}
         draft: false
@@ -66,10 +49,3 @@ jobs:
           app/build/outputs/apk/release/app-release.apk
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      continue-on-error: true
-
-    - name: Upload APK as artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-release
-        path: app/build/outputs/apk/release/app-release.apk
