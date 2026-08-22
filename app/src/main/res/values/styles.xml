@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Базовый стиль для TV -->
+    <style name="Theme.TorrPlayer" parent="Theme.AppCompat.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryDark">@color/primary_dark</item>
+        <item name="colorAccent">@color/accent</item>
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <!-- Увеличиваем масштаб фокуса для всех элементов -->
+        <item name="android:focusable">true</item>
+        <item name="android:focusableInTouchMode">true</item>
+    </style>
+
+    <style name="Theme.TorrPlayer.Player" parent="Theme.TorrPlayer">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:windowContentOverlay">@null</item>
+    </style>
+
+    <!-- Стиль для TV-кнопок с эффектом фокуса -->
+    <style name="Widget.TorrPlayer.Button" parent="Widget.AppCompat.Button">
+        <item name="android:minHeight">48dp</item>
+        <item name="android:minWidth">160dp</item>
+        <item name="android:paddingStart">24dp</item>
+        <item name="android:paddingEnd">24dp</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:background">@drawable/tv_button_background</item>
+        <item name="android:focusable">true</item>
+        <item name="android:focusableInTouchMode">true</item>
+    </style>
+
+    <!-- Стиль для TV-элементов списка -->
+    <style name="Widget.TorrPlayer.ListItem" parent="Widget.AppCompat.TextView">
+        <item name="android:minHeight">56dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:background">?android:attr/selectableItemBackground</item>
+        <item name="android:focusable">true</item>
+        <item name="android:focusableInTouchMode">true</item>
+    </style>
+</resources>
