@@ -1,24 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Базовый стиль для TV -->
-    <style name="Theme.TorrPlayer" parent="Theme.AppCompat.NoActionBar">
-        <item name="colorPrimary">@color/primary</item>
-        <item name="colorPrimaryDark">@color/primary_dark</item>
-        <item name="colorAccent">@color/accent</item>
-        <item name="android:windowBackground">@color/background</item>
-        <item name="android:windowFullscreen">true</item>
-        <item name="android:windowNoTitle">true</item>
-        <!-- Увеличиваем масштаб фокуса для всех элементов -->
-        <item name="android:focusable">true</item>
-        <item name="android:focusableInTouchMode">true</item>
-    </style>
-
-    <style name="Theme.TorrPlayer.Player" parent="Theme.TorrPlayer">
-        <item name="android:windowFullscreen">true</item>
-        <item name="android:windowBackground">@color/background</item>
-        <item name="android:windowContentOverlay">@null</item>
-    </style>
-
     <!-- Стиль для TV-кнопок с эффектом фокуса -->
     <style name="Widget.TorrPlayer.Button" parent="Widget.AppCompat.Button">
         <item name="android:minHeight">48dp</item>
