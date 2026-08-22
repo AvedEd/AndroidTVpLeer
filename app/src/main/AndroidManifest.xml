@@ -9,8 +9,6 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-
-    <!-- ТОЛЬКО ДЛЯ УСТАНОВКИ ОБНОВЛЕНИЙ (при ручном нажатии) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <uses-feature
@@ -77,6 +75,12 @@
                 <data android:scheme="torrent" />
             </intent-filter>
         </activity>
+
+        <!-- НОВАЯ IPTV ACTIVITY -->
+        <activity
+            android:name=".iptv.IptvActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
