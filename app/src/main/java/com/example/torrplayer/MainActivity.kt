@@ -6,6 +6,7 @@ import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.example.torrplayer.iptv.IptvActivity
 import com.example.torrplayer.prefs.AppPrefs
 import com.example.torrplayer.update.UpdateManager
 import kotlinx.coroutines.launch
@@ -38,6 +39,11 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.btn_switch_decoder).setOnClickListener {
             switchDecoder()
+        }
+
+        // НОВАЯ КНОПКА ДЛЯ IPTV
+        findViewById<Button>(R.id.btn_iptv).setOnClickListener {
+            startActivity(Intent(this, IptvActivity::class.java))
         }
     }
 
