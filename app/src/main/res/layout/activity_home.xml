@@ -19,11 +19,10 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="Android TV плеер с поддержкой торрентов"
+        android:text="Android TV плеер с поддержкой торрентов и IPTV"
         android:textColor="@color/text_secondary"
         android:textSize="16sp" />
 
-    <!-- КНОПКА ОТКРЫТЬ ПЛЕЕР -->
     <Button
         android:id="@+id/btn_open_player"
         android:layout_width="match_parent"
@@ -31,7 +30,13 @@
         android:layout_marginTop="32dp"
         android:text="Открыть плеер (тест)" />
 
-    <!-- КНОПКА ПЕРЕКЛЮЧЕНИЯ ДЕКОДЕРА -->
+    <Button
+        android:id="@+id/btn_iptv"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="📺 IPTV" />
+
     <Button
         android:id="@+id/btn_switch_decoder"
         android:layout_width="match_parent"
@@ -39,7 +44,6 @@
         android:layout_marginTop="16dp"
         android:text="Переключить декодер (HW/SW)" />
 
-    <!-- КНОПКА ПРОВЕРКИ ОБНОВЛЕНИЙ -->
     <Button
         android:id="@+id/btn_check_updates"
         android:layout_width="match_parent"
@@ -47,7 +51,6 @@
         android:layout_marginTop="16dp"
         android:text="Проверить обновления" />
 
-    <!-- КНОПКА НАСТРОЕК -->
     <Button
         android:id="@+id/btn_settings"
         android:layout_width="match_parent"
