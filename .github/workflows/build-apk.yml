@@ -1,4 +1,4 @@
-name: Build APK
+name: Build and Release APK
 
 on:
   push:
@@ -28,20 +28,35 @@ jobs:
           cd $GITHUB_WORKSPACE
           gradle assembleRelease
 
-      - name: Upload APK to Release
+      # === НОВЫЙ ШАГ: ПОКАЗЫВАЕМ, ЧТО БЫЛО СОЗДАНО ===
+      - name: List generated files
+        run: |
+          echo "=== Содержимое папки release ==="
+          ls -la app/build/outputs/apk/release/ || echo "Папка release пуста или не существует"
+          echo ""
+          echo "=== Содержимое папки debug ==="
+          ls -la app/build/outputs/apk/debug/ || echo "Папка debug пуста или не существует"
+          echo ""
+          echo "=== Поиск всех APK-файлов ==="
+          find app/build/outputs/apk/ -name "*.apk" || echo "APK-файлы не найдены"
+
+      # === ЗАГРУЖАЕМ НАЙДЕННЫЙ APK ===
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          # Используем wildcard, чтобы найти любой APK
+          path: app/build/outputs/apk/**/*.apk
+
+      - name: Create and Upload Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: TorrPlayer build ${{ github.run_number }}
-          files: app/build/outputs/apk/release/app-release.apk
+          # Используем wildcard
+          files: app/build/outputs/apk/**/*.apk
           generate_release_notes: true
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload APK as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release
-          path: app/build/outputs/apk/release/app-release.apk
