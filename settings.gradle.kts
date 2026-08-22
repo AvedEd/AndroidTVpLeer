@@ -12,6 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-
-rootProject.name = "TorrPlayer"
+rootProject.name = "AndroidTVpLeer"
 include(":app")
