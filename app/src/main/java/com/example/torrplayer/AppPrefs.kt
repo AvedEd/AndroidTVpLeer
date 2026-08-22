@@ -76,15 +76,6 @@ class AppPrefs(context: Context) {
         get() = prefs.getInt("audio_decode_mode", 1)
         set(value) = prefs.edit { putInt("audio_decode_mode", value) }
 
-    // === НАСТРОЙКИ OTA ===
-    var lastUpdateCheck: Long
-        get() = prefs.getLong("last_update_check", 0)
-        set(value) = prefs.edit { putLong("last_update_check", value) }
-
-    var currentVersionCode: Int
-        get() = prefs.getInt("current_version_code", 0)
-        set(value) = prefs.edit { putInt("current_version_code", value) }
-
     // === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ===
     fun savePosition(fileName: String, positionMs: Long) {
         if (positionMs > 5000) {
@@ -98,9 +89,5 @@ class AppPrefs(context: Context) {
 
     fun clearDecoderFallback() {
         prefs.edit { putBoolean("decoder_fallback", false) }
-    }
-
-    fun clearAllPreferences() {
-        prefs.edit { clear() }
     }
 }
