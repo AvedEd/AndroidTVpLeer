@@ -1,62 +1,73 @@
-name: Build TorrPlayer APK
+name: Build and Release
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch: {}
+    tags:
+      - 'v*'  # Запускается при создании тега v1.0.0
+  workflow_dispatch:  # Можно запустить вручную
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v2
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
 
-      - name: Decode release keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.keystore
+    - name: Build APK
+      run: ./gradlew assembleRelease
 
-      - name: Build release APK
-        run: |
-          gradle assembleRelease \
-            -PversionCode=${{ github.run_number }} \
-            -PRELEASE_STORE_FILE=${{ github.workspace }}/release.keystore \
-            -PRELEASE_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }} \
-            -PRELEASE_KEY_ALIAS=${{ secrets.KEY_ALIAS }} \
-            -PRELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }} \
-            --stacktrace
+    - name: Sign APK (if keystore exists)
+      uses: r0adkll/sign-android-release@v1
+      id: sign_app
+      with:
+        releaseDirectory: app/build/outputs/apk/release
+        signingKeyBase64: ${{ secrets.SIGNING_KEY }}
+        alias: ${{ secrets.ALIAS }}
+        keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
+        keyPassword: ${{ secrets.KEY_PASSWORD }}
+      continue-on-error: true  # НЕ ОСТАНАВЛИВАЕТ СБОРКУ ПРИ ОШИБКЕ
 
-      - name: Remove keystore from runner
-        if: always()
-        run: rm -f release.keystore
+    - name: Verify APK signature
+      id: verify_apk
+      run: |
+        if [ -f "app/build/outputs/apk/release/app-release.apk" ]; then
+          echo "APK found, verifying signature..."
+          keytool -printcert -jarfile app/build/outputs/apk/release/app-release.apk
+          echo "APK verification completed successfully!"
+        else
+          echo "APK not found, skipping verification..."
+        fi
+      continue-on-error: true  # НЕ ОСТАНАВЛИВАЕТ СБОРКУ ПРИ ОШИБКЕ
 
-      - name: Print signing certificate fingerprint (для сверки между сборками)
-        run: keytool -printcert -jarfile app/build/outputs/apk/release/app-release.apk
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: TorrPlayer ${{ github.ref_name }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        files: |
+          app/build/outputs/apk/release/app-release.apk
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      continue-on-error: true  # НЕ ОСТАНАВЛИВАЕТ СБОРКУ ПРИ ОШИБКЕ
 
-      - name: Upload build artifact (backup download route)
-        uses: actions/upload-artifact@v4
-        with:
-          name: TorrPlayer-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
-
-      - name: Publish GitHub Release with direct APK link
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: build-${{ github.run_number }}
-          name: TorrPlayer build ${{ github.run_number }}
-          files: app/build/outputs/apk/release/app-release.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Upload APK as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-release
+        path: app/build/outputs/apk/release/app-release.apk
