@@ -6,7 +6,6 @@ import android.net.Uri
 import android.os.Environment
 import android.widget.Toast
 import androidx.core.net.toUri
-import com.example.torrplayer.TorrPlayerApplication
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -21,8 +20,6 @@ class UpdateManager(private val context: Context) {
         private const val GITHUB_API = "https://api.github.com/repos/AvedEd/AndroidTVpLeer/releases/latest"
     }
 
-    private val prefs = TorrPlayerApplication.prefs
-
     data class UpdateInfo(
         val versionName: String,
         val versionCode: Int,
@@ -30,6 +27,9 @@ class UpdateManager(private val context: Context) {
         val changelog: String
     )
 
+    /**
+     * Проверяет наличие обновлений на GitHub (ручной вызов)
+     */
     suspend fun checkForUpdates(): UpdateInfo? = withContext(Dispatchers.IO) {
         try {
             val url = URL(GITHUB_API)
@@ -58,7 +58,7 @@ class UpdateManager(private val context: Context) {
                     }
                 }
 
-                if (downloadUrl != null && versionCode > prefs.currentVersionCode) {
+                if (downloadUrl != null) {
                     return@withContext UpdateInfo(
                         versionName = versionName,
                         versionCode = versionCode,
@@ -75,6 +75,9 @@ class UpdateManager(private val context: Context) {
         }
     }
 
+    /**
+     * Скачивает обновление (ручной вызов)
+     */
     fun downloadUpdate(updateInfo: UpdateInfo): Long {
         val fileName = "torrplayer_${updateInfo.versionName}.apk"
         val destinationFile = File(
@@ -91,13 +94,15 @@ class UpdateManager(private val context: Context) {
             .setDescription("Загрузка версии ${updateInfo.versionName}")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationUri(Uri.fromFile(destinationFile))
-            // Убираем setRequiresWifi — устарел, используем setAllowedNetworkTypes
             .setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE)
 
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         return downloadManager.enqueue(request)
     }
 
+    /**
+     * Устанавливает скачанный APK (ручной вызов)
+     */
     fun installUpdate(filePath: String) {
         val file = File(filePath)
         if (!file.exists()) {
@@ -122,13 +127,5 @@ class UpdateManager(private val context: Context) {
         } catch (e: Exception) {
             Toast.makeText(context, "Не удалось открыть установщик: ${e.message}", Toast.LENGTH_LONG).show()
         }
-    }
-
-    fun getDownloadedApk(): File? {
-        val downloadDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-        val apkFiles = downloadDir?.listFiles { file ->
-            file.name.startsWith("torrplayer_") && file.name.endsWith(".apk")
-        }
-        return apkFiles?.maxByOrNull { it.lastModified() }
     }
 }
