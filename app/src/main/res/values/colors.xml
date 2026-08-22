@@ -14,4 +14,8 @@
     <color name="background">#000000</color>
     <color name="panel_background">#cc000000</color>
     <color name="error_background">#ccff0000</color>
+    
+    <!-- НОВЫЕ ЦВЕТА ДЛЯ ОШИБОК -->
+    <color name="overlay_dark">#cc000000</color>
+    <color name="overlay_panel">#cc000000</color>
 </resources>
