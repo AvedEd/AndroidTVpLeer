@@ -17,7 +17,7 @@ import java.net.URL
 class UpdateManager(private val context: Context) {
 
     companion object {
-        // ⚠️ ЗАМЕНИТЕ НА ВАШ РЕПОЗИТОРИЙ
+        // ЗАМЕНИТЕ НА ВАШ РЕПОЗИТОРИЙ
         private const val GITHUB_API = "https://api.github.com/repos/AvedEd/AndroidTVpLeer/releases/latest"
     }
 
@@ -91,9 +91,8 @@ class UpdateManager(private val context: Context) {
             .setDescription("Загрузка версии ${updateInfo.versionName}")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationUri(Uri.fromFile(destinationFile))
-            .setRequiresWifi(false)
-            .setAllowedOverRoaming(true)
-            .setAllowedOverMetered(true)
+            // Убираем setRequiresWifi — устарел, используем setAllowedNetworkTypes
+            .setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE)
 
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         return downloadManager.enqueue(request)
