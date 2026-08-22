@@ -9,29 +9,16 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- ФУНКЦИОНАЛЬНЫЕ ВОЗМОЖНОСТИ -->
+    <!-- ТОЛЬКО ДЛЯ УСТАНОВКИ ОБНОВЛЕНИЙ (при ручном нажатии) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <uses-feature
         android:name="android.software.leanback"
         android:required="false" />
     <uses-feature
         android:name="android.hardware.touchscreen"
         android:required="false" />
-
-    <!-- ПАКЕТНАЯ ВИДИМОСТЬ -->
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:mimeType="application/vnd.android.package-archive" />
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="http" />
-            <data android:scheme="https" />
-        </intent>
-    </queries>
 
     <application
         android:name=".TorrPlayerApplication"
@@ -45,7 +32,6 @@
         android:requestLegacyExternalStorage="true"
         tools:targetApi="29">
 
-        <!-- MAIN ACTIVITY -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -57,13 +43,11 @@
             </intent-filter>
         </activity>
 
-        <!-- SETTINGS -->
         <activity
             android:name=".SettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />
 
-        <!-- PLAYER -->
         <activity
             android:name=".PlayerActivity"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout"
@@ -94,7 +78,6 @@
             </intent-filter>
         </activity>
 
-        <!-- FILE PROVIDER -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -104,15 +87,6 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-
-        <!-- UPDATE RECEIVER -->
-        <receiver
-            android:name=".update.UpdateReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
-            </intent-filter>
-        </receiver>
 
     </application>
 </manifest>
