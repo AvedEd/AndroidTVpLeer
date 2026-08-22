@@ -18,11 +18,17 @@ android {
     // ===== НАСТРОЙКА ПОДПИСИ =====
     signingConfigs {
         create("release") {
-            // Используем переменные окружения для безопасности
+            // Значения приходят из переменных окружения, которые задаёт CI
+            // (см. блок env: в .github/workflows/build-apk.yml).
+            // Если переменная не задана - сборка упадёт с понятной ошибкой,
+            // а не соберётся тихо с неправильным ключом.
             storeFile = file("release.keystore")
-            storePassword = System.getenv("KEY_STORE_PASSWORD") ?: "android"
-            keyAlias = System.getenv("KEY_ALIAS") ?: "android"
-            keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
+            storePassword = System.getenv("KEYSTORE_PASSWORD")
+                ?: error("KEYSTORE_PASSWORD is not set")
+            keyAlias = System.getenv("KEY_ALIAS")
+                ?: error("KEY_ALIAS is not set")
+            keyPassword = System.getenv("KEY_PASSWORD")
+                ?: error("KEY_PASSWORD is not set")
         }
     }
 
