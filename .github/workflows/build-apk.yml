@@ -25,21 +25,22 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v2
 
-    - name: Build APK (without gradlew)
+    - name: Build APK
       run: |
         cd $GITHUB_WORKSPACE
         gradle assembleRelease
 
-    - name: Sign APK (if keystore exists)
-      uses: r0adkll/sign-android-release@v1
-      id: sign_app
-      with:
-        releaseDirectory: app/build/outputs/apk/release
-        signingKeyBase64: ${{ secrets.SIGNING_KEY }}
-        alias: ${{ secrets.ALIAS }}
-        keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-        keyPassword: ${{ secrets.KEY_PASSWORD }}
-      continue-on-error: true
+    # ШАГ ПОДПИСИ ВРЕМЕННО ОТКЛЮЧЁН
+    # - name: Sign APK (if keystore exists)
+    #   uses: r0adkll/sign-android-release@v1
+    #   id: sign_app
+    #   with:
+    #     releaseDirectory: app/build/outputs/apk/release
+    #     signingKeyBase64: ${{ secrets.SIGNING_KEY }}
+    #     alias: ${{ secrets.ALIAS }}
+    #     keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
+    #     keyPassword: ${{ secrets.KEY_PASSWORD }}
+    #   continue-on-error: true
 
     - name: Verify APK signature
       id: verify_apk
