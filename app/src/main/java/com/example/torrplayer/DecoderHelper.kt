@@ -2,10 +2,7 @@ package com.example.torrplayer.player
 
 import android.content.Context
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.decoder.DecoderFactory
-import androidx.media3.decoder.DefaultDecoderFactory
 import androidx.media3.exoplayer.DefaultRenderersFactory
-import androidx.media3.exoplayer.video.VideoSink
 import com.example.torrplayer.prefs.AppPrefs
 
 @UnstableApi
@@ -22,36 +19,13 @@ object DecoderHelper {
         val factory = DefaultRenderersFactory(context)
 
         if (isHW) {
+            // Аппаратный режим — используем MediaCodec
             factory.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
             factory.setEnableDecoderFallback(true)
-
-            factory.setVideoSink(
-                VideoSink.Builder()
-                    .setDecoderFactory(
-                        DefaultDecoderFactory(
-                            listOf(
-                                DecoderFactory.VIDEO_MEDIA_CODEC,
-                                DecoderFactory.VIDEO_SOFTWARE
-                            )
-                        )
-                    )
-                    .build()
-            )
         } else {
+            // Программный режим — только софт
             factory.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
             factory.setEnableDecoderFallback(false)
-
-            factory.setVideoSink(
-                VideoSink.Builder()
-                    .setDecoderFactory(
-                        DefaultDecoderFactory(
-                            listOf(
-                                DecoderFactory.VIDEO_SOFTWARE
-                            )
-                        )
-                    )
-                    .build()
-            )
         }
 
         return factory
