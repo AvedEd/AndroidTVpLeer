@@ -63,6 +63,19 @@ class AppPrefs(context: Context) {
         get() = prefs.getBoolean("decoder_fallback", false)
         set(value) = prefs.edit { putBoolean("decoder_fallback", value) }
 
+    // === НАСТРОЙКИ ДЛЯ ТОРРЕНТОВ ===
+    var serverHost: String
+        get() = prefs.getString("server_host", "http://127.0.0.1:8090") ?: "http://127.0.0.1:8090"
+        set(value) = prefs.edit { putString("server_host", value) }
+
+    var tunnelingEnabled: Boolean
+        get() = prefs.getBoolean("tunneling", false)
+        set(value) = prefs.edit { putBoolean("tunneling", value) }
+
+    var audioDecodeMode: Int
+        get() = prefs.getInt("audio_decode_mode", 1)
+        set(value) = prefs.edit { putInt("audio_decode_mode", value) }
+
     // === НАСТРОЙКИ OTA ===
     var lastUpdateCheck: Long
         get() = prefs.getLong("last_update_check", 0)
@@ -85,5 +98,9 @@ class AppPrefs(context: Context) {
 
     fun clearDecoderFallback() {
         prefs.edit { putBoolean("decoder_fallback", false) }
+    }
+
+    fun clearAllPreferences() {
+        prefs.edit { clear() }
     }
 }
