@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="background">#101014</color>
-    <color name="surface">#1C1C22</color>
-    <color name="accent">#3DDC84</color>
-    <color name="text_primary">#FFFFFF</color>
-    <color name="text_secondary">#AAAAAA</color>
-    <color name="text_muted">#CCCCCC</color>
-    <color name="border">#33FFFFFF</color>
-    <color name="overlay_panel">#AA000000</color>
-    <color name="overlay_dark">#CC000000</color>
+    <!-- Основные цвета -->
+    <color name="primary">#1a1a1a</color>
+    <color name="primary_dark">#0d0d0d</color>
+    <color name="accent">#ff6b35</color>
+    
+    <!-- Текст -->
+    <color name="text_primary">#ffffff</color>
+    <color name="text_secondary">#b0b0b0</color>
+    <color name="text_muted">#808080</color>
+    
+    <!-- Фоны -->
+    <color name="background">#000000</color>
+    <color name="panel_background">#cc000000</color>
+    <color name="error_background">#ccff0000</color>
 </resources>
